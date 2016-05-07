@@ -20,7 +20,7 @@ public class TorMessage {
     }
 
     public byte[] getBytes(){
-        byte[] toSend=(type+":"+body).getBytes();
+        byte[] toSend=(type+"`"+body).getBytes();
         return toSend;
     }
 
