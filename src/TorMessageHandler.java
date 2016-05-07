@@ -49,16 +49,16 @@ class TorMessageHandler implements Runnable{
             boolean connOpen = true;
             while(connOpen) {
                 if(inFromPrevious.ready()&&(clientReq=inFromPrevious.readLine())!="") {
-                    String[] previousSplit = clientReq.split("`");
-                    TorServer.Debug(previousSplit[0]);
-                    switch (previousSplit[0]) {
-                        case "CREATE":
+                    TorMessage receivedMsg = new TorMessage(clientReq);
+                    TorServer.Debug(receivedMsg.getType()+"");
+                    switch (receivedMsg.getType()) {
+                        case CREATE:
                             //alocate resources, agree on key
                             break;
-                        case "EXTEND":
+                        case EXTEND:
                             exitServer = false;
-                            String nextTorHost = previousSplit[1];
-                            int nextTorPort = Integer.parseInt(previousSplit[2]);
+                            String nextTorHost = receivedMsg.getExtendHost();
+                            int nextTorPort = receivedMsg.getExtendPort();
                             InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
                             Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
                             TorMessage extMessage = new TorMessage(TorMessage.Type.CREATE, "\n");
@@ -70,22 +70,23 @@ class TorMessageHandler implements Runnable{
                             outToNext.write(extMessage.getBytes());
                             outToPrevious.write(extended.getBytes());
                             break;
-                        case "DATA":
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, previousSplit[1]);
+                        case DATA:
+                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
                             outToPrevious.write(dataRelay.getBytes());
                             break;
-                        case "BEGIN":
+                        case BEGIN:
                             if (exitServer) {
-                                String targetURL = previousSplit[1];
+                                String targetURL = receivedMsg.getBeginURL();
                                 String response = getHTML(targetURL);
                                 TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response + "\n");
                                 outToPrevious.write(dataResponse.getBytes());
                             } else {
-                                TorMessage beginRelay = new TorMessage(TorMessage.Type.BEGIN, previousSplit[1] + "\n");
+                                TorMessage beginRelay = new TorMessage(
+                                        TorMessage.Type.BEGIN, receivedMsg.getDataPayload() + "\n");
                                 outToNext.write(beginRelay.getBytes());
                             }
                             break;
-                        case "TEARDOWN":
+                        case TEARDOWN:
                             if (!exitServer) {
                                 TorMessage tearDown = new TorMessage(TorMessage.Type.TEARDOWN, "\n");
                                 outToNext.write(tearDown.getBytes());
@@ -97,11 +98,11 @@ class TorMessageHandler implements Runnable{
                     }
                 }
                 if(!exitServer&&inFromNext.ready()&&(nextResponse=inFromNext.readLine())!=""){
-                    String[] nextSplit = nextResponse.split("`");
-                    TorServer.Debug("NEXT"+nextSplit[0]);
-                    switch (nextSplit[0]) {
-                        case "DATA":
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, nextSplit[1]);
+                    TorMessage receivedMsg = new TorMessage(clientReq);
+                    TorServer.Debug("RELAYING "+receivedMsg.getType());
+                    switch (receivedMsg.getType()) {
+                        case DATA:
+                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
                             outToPrevious.write(dataRelay.getBytes());
                             break;
                         default:
