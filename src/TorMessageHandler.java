@@ -73,6 +73,7 @@ class TorMessageHandler implements Runnable{
                         case DATA:
                             TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
                             outToPrevious.write(dataRelay.getBytes());
+                            outToPrevious.write("\n".getBytes());
                             break;
                         case BEGIN:
                             if (exitServer) {
@@ -94,6 +95,7 @@ class TorMessageHandler implements Runnable{
                             connOpen = false;
                             break;
                         default:
+                            outToPrevious.write("Bad Message!\n".getBytes());
                             TorServer.Debug("Bad Message!");
                     }
                 }

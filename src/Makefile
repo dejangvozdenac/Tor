@@ -1,7 +1,7 @@
 all: project
 
 project:
-    javac *.java
+	javac *.java
 
 clean:
 	rm *.class
