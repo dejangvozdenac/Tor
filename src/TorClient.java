@@ -17,7 +17,7 @@ import java.util.*;
 // import com.sun.crypto.provider.SunJCE;
 
 public class TorClient {
-    static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
+    static boolean DEBUG = true; // if false, then automatically sets up and tears down circuit
 
     public static void main(String args[]) throws Exception {
         if (args.length != 3) {

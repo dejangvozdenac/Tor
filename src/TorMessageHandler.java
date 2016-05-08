@@ -102,7 +102,7 @@ class TorMessageHandler implements Runnable{
                     TorServer.Debug("RELAYING "+receivedMsg.getType());
                     switch (receivedMsg.getType()) {
                         case DATA:
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
+                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload()+"\n");
                             outToPrevious.write(dataRelay.getBytes());
                             break;
                         default:
