@@ -1,9 +1,7 @@
 /**
  * Created by dejan on 5/6/16.
  */
-/**
- ** Yale CS433/533 Demo Basic Web Server
- **/
+
 import java.io.*;
 import java.nio.*;
 import java.nio.file.Files;
@@ -19,8 +17,8 @@ class TorMessageHandler implements Runnable{
     private DataOutputStream outToPrevious;
     private BufferedReader inFromNext;
     private DataOutputStream outToNext;
-    boolean entryServer;
-    boolean exitServer;
+    private boolean entryServer;
+    private boolean exitServer;
 
     public void run()
     {
@@ -83,7 +81,7 @@ class TorMessageHandler implements Runnable{
                                 outToPrevious.write(dataResponse.getBytes());
                             } else {
                                 TorMessage beginRelay = new TorMessage(
-                                        TorMessage.Type.BEGIN, receivedMsg.getDataPayload() + "\n");
+                                        TorMessage.Type.BEGIN, receivedMsg.getBeginURL() + "\n");
                                 outToNext.write(beginRelay.getBytes());
                             }
                             break;
@@ -100,7 +98,7 @@ class TorMessageHandler implements Runnable{
                     }
                 }
                 if(!exitServer&&inFromNext.ready()&&(nextResponse=inFromNext.readLine())!=""){
-                    TorMessage receivedMsg = new TorMessage(clientReq);
+                    TorMessage receivedMsg = new TorMessage(nextResponse);
                     TorServer.Debug("RELAYING "+receivedMsg.getType());
                     switch (receivedMsg.getType()) {
                         case DATA:
