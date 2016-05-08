@@ -17,7 +17,7 @@ import java.util.*;
 // import com.sun.crypto.provider.SunJCE;
 
 public class TorClient {
-    static boolean DEBUG = true; // if false, then automatically sets up and tears down circuit
+    static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
 
     public static void main(String args[]) throws Exception {
         if (args.length != 3) {
@@ -97,8 +97,8 @@ public class TorClient {
         // System.out.printf("Sent: " + msg);
         // outToServer.writeBytes(msg);
 
-        TorMessage dataMsg = TorMessage(TorMessage.Type.DATA, url + "\n");
-        outToServer.write(dataMsg);
+        TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url + "\n");
+        outToServer.write(dataMsg.getBytes());
 
         String msgFromServer = inFromServer.readLine();
         Debug("Received: " + msgFromServer);

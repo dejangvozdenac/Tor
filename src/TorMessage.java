@@ -66,7 +66,7 @@ public class TorMessage {
     }
 
     public String getString(){
-        return type+body;
+        return type+SEPARATOR+body;
     }
 
     public Type getType() {
