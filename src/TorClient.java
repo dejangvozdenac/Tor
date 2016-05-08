@@ -17,9 +17,9 @@ import java.util.*;
 // import com.sun.crypto.provider.SunJCE;
 
 public class TorClient {
-    static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
+    static boolean DEBUG = true; // if false, then automatically sets up and tears down circuit
 
-    public static void main(String args[]) throws Exception  {
+    public static void main(String args[]) throws Exception {
         if (args.length != 3) {
             Debug("Usage: java TCPClient [server addr] [server port] [OR file]");
             System.exit(1);
@@ -27,9 +27,9 @@ public class TorClient {
 
         String serverName = args[0];
         int serverPort = Integer.parseInt(args[1]);
-        String filename = args[2];
+        String orFilename = args[2];
 
-        List<String> onionRouters = readRouters(filename);
+        List<String> onionRouters = readRouters(orFilename);
         List<String> path = pickPath(2, onionRouters); // TODO: randomize number of ORs
 
         // create socket to first onion router
@@ -72,17 +72,17 @@ public class TorClient {
 
             // get input
             System.out.printf("file to retrieve: ");
-            String sentence = inFromUser.readLine();
+            String filename = inFromUser.readLine();
 
             // fetch data
-            while (sentence.length() != 0) {
+            while (filename.length() != 0) {
                 // write to target server
-                String url = filenametoURL(serverName, serverPort, sentence);
+                String url = filenametoURL(serverName, serverPort, filename);
                 retreiveURL(outToServer, inFromServer, url);
 
                 // get more input
                 System.out.printf("file to retrieve: ");
-                sentence = inFromUser.readLine();
+                filename = inFromUser.readLine();
             }
 
             teardownCircuit(outToServer, inFromServer);
@@ -93,9 +93,12 @@ public class TorClient {
     }
 
     public static void retreiveURL(DataOutputStream outToServer, BufferedReader inFromServer, String url) throws Exception {
-        String msg = "DATA`" + url + "\n";
-        System.out.printf("Sent: " + msg);
-        outToServer.writeBytes(msg);
+        // String msg = "DATA`" + url + "\n";
+        // System.out.printf("Sent: " + msg);
+        // outToServer.writeBytes(msg);
+
+        TorMessage dataMsg = TorMessage(TorMessage.Type.DATA, url + "\n");
+        outToServer.write(dataMsg);
 
         String msgFromServer = inFromServer.readLine();
         Debug("Received: " + msgFromServer);
@@ -111,9 +114,10 @@ public class TorClient {
             String orServerName = orPath.get(i).split(" ")[0];
             int orPort = Integer.parseInt(orPath.get(i).split(" ")[1]);
 
-            String extendMsg = "EXTEND`" + orServerName + "`" + orPort + "\n";
-            // TorMessage extendMsg = new TorMessage(TorMessage.Type.EXTEND, "`" + orServerName + "`" + orPort + "\n");
-            // System.out.printf("Sent: " + extendMsg.getString());
+            // String extendMsg = "EXTEND`" + orServerName + "`" + orPort + "\n";
+            // System.out.printf("Sent: " + extendMsg);
+            TorMessage extendMsg = new TorMessage(TorMessage.Type.EXTEND, orServerName + "`" + orPort + "\n");
+            System.out.printf("Sent: " + extendMsg.getString());
             outToServer.write(extendMsg.getBytes());
 
             String msgFromServer = inFromServer.readLine();
