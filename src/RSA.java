@@ -19,14 +19,14 @@ public class RSA {
         privateKey = key.getPrivate();
     }
 
-    public static getPrivateKey() {
+    public static PrivateKey getPrivateKey() {
         return privateKey;
     }
 
-    public static getPublicKey() {
+    public static PublicKey getPublicKey() {
         return publicKey;
     }
-    
+
     public static byte[] encrypt(String text, PublicKey key) {
         byte[] cipherText = null;
 
@@ -60,5 +60,5 @@ public class RSA {
         }
 
         return new String(dectyptedText);
-      }
+    }
 }
