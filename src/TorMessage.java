@@ -15,19 +15,20 @@ public class TorMessage {
     private PublicKey publicKey;
     private String extendHost;
     private int extendPort;
-    private String payload;
+    private byte[] payload;
     private String url;
 
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
     public TorMessage(Type type, PublicKey publicKey) {
+        this.length = 1 + publicKey.getEncoded().length;
         this.type = type;
         this.publicKey = publicKey;
     }
 
     // type EXTEND
     public TorMessage(Type type, PublicKey publicKey, String extendHost, int extendPort) {
-        this.length = 1 + 
+        this.length = 1 + publicKey.getEncoded().length + extendHost.getBytes().length + 4;
         this.type = type;
         this.publicKey = publicKey;
         this.extendHost = extendHost;
@@ -36,7 +37,7 @@ public class TorMessage {
 
     // type DATA
     public TorMessage(Type type, byte[] payload) {
-        this.legnth = 1 + payload.length;
+        this.length = 1 + payload.length;
         this.type = type;
         this.payload = payload;
     }
@@ -103,7 +104,7 @@ public class TorMessage {
     }
 
     public byte[] getBytes() {
-        byte[] byteRepresentation;
+        byte[] byteRepresentation = ;
 
         switch (type) {
             case "CREATE":
@@ -129,7 +130,7 @@ public class TorMessage {
         return extendHost;
     }
 
-    public String getPayload() {
+    public byte[] getPayload() {
         return payload;
     }
 
@@ -137,7 +138,7 @@ public class TorMessage {
         return url;
     }
 
-    public String getPublicKey() {
+    public PublicKey getPublicKey() {
         return publicKey;
     }
 }
