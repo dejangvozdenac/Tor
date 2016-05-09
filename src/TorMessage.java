@@ -57,6 +57,8 @@ public class TorMessage {
                     return Type.DATA;
                 case 10:
                     return Type.TEARDOWN;
+                default:
+                    return Type.BEGIN; // TODO: BAD
             }
         }
     }
@@ -113,7 +115,7 @@ public class TorMessage {
     }
 
     // used to construct when receiving
-    public TorMessage(byte[] packedMessageBytes, int length) {
+    public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
         int typeInt = packedMessage.getInt();
@@ -127,7 +129,7 @@ public class TorMessage {
                 publicKeyBytes = new byte[length];
                 packedMessage.get(publicKeyBytes, 0, length);
 
-                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
                 break;
 
             case BEGIN:
@@ -147,7 +149,7 @@ public class TorMessage {
 
                 publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN];
                 packedMessage.get(publicKeyBytes, 0, length - 4 - SERVER_NAME_MAX_LEN);
-                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
                 break;
         }
     }
@@ -182,7 +184,8 @@ public class TorMessage {
 
     public byte[] getBytes() {
         byte[] byteRepr = new byte[bytes.capacity()];
-        return bytes.get(byteRepr, 0, byteRepr.length);;
+        bytes.get(byteRepr, 0, byteRepr.length);
+        return byteRepr; 
     }
 
     // for debugging purposes
