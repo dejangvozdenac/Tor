@@ -1,12 +1,13 @@
 import javax.crypto.SecretKey;
 import java.security.PublicKey;
 import java.nio.ByteBuffer;
+import java.security.spec.X509EncodedKeySpec;
 
 /**
  * Created by dejan on 5/6/16.
  */
 public class TorMessage {
-    final static SERVER_NAME_MAX_LEN = 19;
+    final static int SERVER_NAME_MAX_LEN = 19;
 
     public enum Type {
         CREATE,
@@ -74,29 +75,28 @@ public class TorMessage {
     }
 
     // used to construct when receiving
-    public TorMessage(byte[] packedMessage, int length) {
-        packedMessage = ByteBuffer.wrap(packedMessage);
+    public TorMessage(byte[] packedMessageBytes, int length) {
+        ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
         type = packedMessage.getInt();
 
         switch (type) {
-            case Type.CREATE:
-            case Type.CREATED:
-            case Type.EXTENDED:
+            case CREATE:
+            case CREATED:
+            case EXTENDED:
                 byte[] publicKeyBytes = new byte[length];
                 packedMessage.get(publicKeyBytes, 0, length);
 
-                // TODO: how to change publickey back from bytes?
-                // PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
                 break;
 
-            case Type.BEGIN:
-            case Type.DATA:
+            case BEGIN:
+            case DATA:
                 byte[] payloadBytes = new byte[length];
                 packedMessage.get(payloadBytes, 0, length);
                 break;
 
-            case Type.EXTEND:
+            case EXTEND:
                 byte[] serverNameBytes = new byte[SERVER_NAME_MAX_LEN];
                 packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN);
                 
@@ -107,8 +107,7 @@ public class TorMessage {
 
                 byte[] publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN];
                 packedMessage.get(publicKeyBytes, 0, length - 4 - SERVER_NAME_MAX_LEN);
-                // TODO: how to change publickey back from bytes?
-                // PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
                 break;
         }
     }
@@ -120,33 +119,40 @@ public class TorMessage {
         bytes.putInt(type);
 
         switch (type) {
-            case Type.CREATE:
-            case Type.CREATED:
+            case CREATE:
+            case CREATED:
                 bytes.put(publicKey.getEncoded());
                 break;
-            case Type.EXTENDED:
+            case EXTENDED:
                 bytes.put(publicKey.getEncoded());
                 break;
-            case Type.EXTEND:
+            case EXTEND:
                 int start = bytes.position;
 
                 bytes.put((extendHost + " ").getBytes());
                 bytes.putInt(extendPort, start + SERVER_NAME_MAX_LEN + 1); // padding host
                 bytes.put(publicKey.getEncoded());
                 break;
-            case Type.BEGIN:
-            case Type.DATA:
+            case BEGIN:
+            case DATA:
                 bytes.put(payload);
                 break;
         }
     }
 
-    public ByteBuffer[] getBytes() {
-        return bytes;
+    public byte[] getBytes() {
+        return ByteBuffer.wrap(bytes);
     }
 
+    // for debugging purposes
     public String getString() {
-        return type + SEPARATOR + body + "\n";
+        return "length: " + Integer.toString(length) +
+               " type: " + type + 
+               " publicKey (don't trust) " + publicKey.toString() + 
+               " host: " + extendHost +
+               " port: " + Integer.toString(extendPort) + 
+               " payload: " + new String(payload) + 
+               " url: " + url;
     }
 
     public Type getType() {
