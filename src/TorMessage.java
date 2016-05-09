@@ -7,7 +7,7 @@ public class TorMessage {
     private static final String SEPARATOR = "`";
 
     public enum Type {
-        CREATE, CREATED, EXTEND, EXTENDED, RELAY, RELAYED, BEGIN, DATA, TEARDOWN;
+        CREATE, CREATED, AES_REQUEST, AES_RESPONSE, EXTEND, EXTENDED, RELAY, RELAYED, BEGIN, DATA, TEARDOWN;
     }
 
     private int length;
@@ -35,7 +35,7 @@ public class TorMessage {
         this.extendPort = extendPort;
     }
 
-    // type DATA
+    // type DATA, AES_REQUEST, AES_RESPONSE
     public TorMessage(Type type, byte[] payload) {
         this.length = 1 + payload.length;
         this.type = type;

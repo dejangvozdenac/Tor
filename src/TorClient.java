@@ -4,9 +4,11 @@
  * Usage: java TorClient [server addr] [server port]
  */
 
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.net.*;
 import java.security.Provider;
+import java.security.PublicKey;
 import java.util.*;
 // import java.math.BigInteger;
 // import java.security.*;
@@ -19,7 +21,10 @@ import java.util.*;
 
 public class TorClient {
     static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
+    private static final int ONION_SERVER_COUNT = 1;
     private static RSA encryption;
+    private static PublicKey[] remotePublicKeys = new PublicKey[ONION_SERVER_COUNT];
+    private static SecretKey[] secretKeys = new SecretKey[ONION_SERVER_COUNT];
 
     public static void main(String args[]) throws Exception {
         if (args.length != 3) {
@@ -32,7 +37,7 @@ public class TorClient {
         String orFilename = args[2];
 
         List<String> onionRouters = readRouters(orFilename);
-        List<String> path = pickPath(1, onionRouters); // TODO: randomize number of ORs
+        List<String> path = pickPath(ONION_SERVER_COUNT, onionRouters); // TODO: randomize number of ORs
 
         encryption = new RSA();
 
@@ -88,7 +93,7 @@ public class TorClient {
             while (filename.length() != 0) {
                 // write to target server
                 String url = filenametoURL(serverName, serverPort, filename);
-                retreiveURL(outToServer, inFromServer, url);
+                retrieveURL(outToServer, inFromServer, url);
 
                 // get more input
                 System.out.printf("file to retrieve: ");
@@ -102,39 +107,42 @@ public class TorClient {
         clientSocket.close();
     }
 
-    public static void retreiveURL(DataOutputStream outToServer, BufferedReader inFromServer, String url) throws Exception {
-        // String msg = "DATA`" + url + "\n";
-        // System.out.printf("Sent: " + msg);
-        // outToServer.writeBytes(msg);
-
-        TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
+    private static void retrieveURL(DataOutputStream outToServer, BufferedReader inFromServer, String url) throws Exception {
+          TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
         outToServer.write(dataMsg.getBytes());
 
         String msgFromServer = inFromServer.readLine();
         Debug("Received: " + msgFromServer);
     }
 
-    public static void teardownCircuit(DataOutputStream outToServer, BufferedReader inFromServer) throws Exception {
-        TorMessage teardownMsg = new TorMessage(TorMessage.Type.TEARDOWN, "");
+    private static void teardownCircuit(DataOutputStream outToServer, BufferedReader inFromServer) throws Exception {
+        TorMessage teardownMsg = new TorMessage(TorMessage.Type.TEARDOWN);
         outToServer.write(teardownMsg.getBytes());
     }
 
-    public static void establishSecureConnection(DataOutputStream outBuffer, BufferedReader inBuffer) throws Exception {
+    private static void establishSecureConnection(DataOutputStream outBuffer, BufferedReader inBuffer) throws Exception {
         TorMessage createMsg = new TorMessage(TorMessage.Type.CREATE, encryption.getPublicKey());
         outBuffer.write(createMsg.getBytes());
         System.out.printf("Sent: " + createMsg.getString());
 
-        String msgFromServer = inBuffer.readLine();
-        Debug("Received: " + msgFromServer);
+        TorMessage msgFromServer = new TorMessage(readMessage(inBuffer));
+        Debug("Received: " + msgFromServer.toString());
+        remotePublicKeys[0] = msgFromServer.getPublicKey();
+
+        AES symmetricEncryption = new AES();
+
+        TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
+                encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[0]));
+
     }
 
-    public static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
+    private static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
             throws Exception {
         for (int i = 1; i < orPath.size(); i++) {
             String orServerName = orPath.get(i).split(" ")[0];
             int orPort = Integer.parseInt(orPath.get(i).split(" ")[1]);
 
-            TorMessage extendMsg = new TorMessage(TorMessage.Type.RELAY, orServerName + "`" + orPort);
+            TorMessage extendMsg = new TorMessage(TorMessage.Type.RELAY,encryption.getPublicKey(),orServerName,orPort);
             System.out.printf("Sent: " + extendMsg.getString());
             outToServer.write(extendMsg.getBytes());
 
@@ -143,17 +151,24 @@ public class TorClient {
         }
     }
 
-    public static String filenametoURL(String serverName, int port, String filename) {
+    private static byte[] readMessage(BufferedReader in) throws Exception{
+        int length = Integer.parseInt(in.readLine());
+        char[] msg = new char[length];
+        in.read(msg, 0, length);
+        return (new String(msg).getBytes("UTF-8"));
+    }
+
+    private static String filenametoURL(String serverName, int port, String filename) {
         return "http://" + serverName + ":" + Integer.toString(port) + "/" + filename;
     }
 
     // TODO: pick randomly, currently picks first "length" number of onion routers    
     // takes in list of hostnames and path length
-    public static List<String> pickPath(int length, List<String> onionRouters) {
+    private static List<String> pickPath(int length, List<String> onionRouters) {
         return onionRouters.subList(0, length);
     }
 
-    public static List<String> readRouters(String filename) {
+    private static List<String> readRouters(String filename) {
         List<String> routers = new ArrayList<String>();
         
         BufferedReader br;
@@ -174,7 +189,7 @@ public class TorClient {
         return routers;
     }
 
-    public static void Debug(String s){
+    private static void Debug(String s){
         System.out.println(s);
     }
 }

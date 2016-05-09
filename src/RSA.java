@@ -3,8 +3,8 @@ import javax.crypto.Cipher;
 
 public class RSA {
     static int keySize = 1024;
-    static PublicKey publicKey;
-    static PrivateKey privateKey;
+    PublicKey publicKey;
+    PrivateKey privateKey;
 
     public RSA() throws Exception {
         final KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -15,12 +15,12 @@ public class RSA {
         privateKey = key.getPrivate();
     }
 
-    public static PrivateKey getPrivateKey() {
+    public PrivateKey getPrivateKey() {
         return privateKey;
     }
 
-    public static String getPublicKey() {
-        return new String(publicKey.getEncoded());
+    public PublicKey getPublicKey() {
+        return publicKey;
     }
 
     public static byte[] encrypt(String text, PublicKey key) {
