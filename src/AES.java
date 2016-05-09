@@ -44,6 +44,7 @@ public class AES {
 
     public static byte[] encrypt(byte[] toEncrypt, SecretKey secretKey) throws Exception {
         Cipher cipher = Cipher.getInstance("AES");
+        System.out.println(secretKey.getAlgorithm());
         cipher.init(Cipher.ENCRYPT_MODE, secretKey);
 
         byte[] encryptedByte = cipher.doFinal(toEncrypt);
