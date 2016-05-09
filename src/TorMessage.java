@@ -118,10 +118,12 @@ public class TorMessage {
     // used to construct when receiving
     // TODO: don't actually need to pass in length right now
     public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
-        // bytes = ByteBuffer.allocate(length);
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
-        this.length = packedMessage.getInt();
+        // TODO: REMOVE THIS:
+        int dummy = packedMessage.getInt();
+
+        this.length = length;
         int typeInt = packedMessage.getInt();
         type = Type.toEnum(typeInt);
 
@@ -145,16 +147,16 @@ public class TorMessage {
                 break;
 
             case EXTEND:
-                byte[] serverNameBytes = new byte[SERVER_NAME_MAX_LEN];
-                packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN);
+                byte[] serverNameBytes = new byte[SERVER_NAME_MAX_LEN + 2];
+                packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN + 2);
                 
                 String extendHostJunk = new String(serverNameBytes);
                 extendHost = extendHostJunk.split(" ")[0];
 
                 extendPort = packedMessage.getInt();
 
-                publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN - 2 - 4 - 4];
-                packedMessage.get(publicKeyBytes, 0, length - 4 - SERVER_NAME_MAX_LEN);
+                publicKeyBytes = new byte[packedMessage.remaining()];
+                packedMessage.get(publicKeyBytes, 0, packedMessage.remaining());
                 publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
                 break;
         }
@@ -190,28 +192,6 @@ public class TorMessage {
                 bytes.put(payload);
                 break;
         }
-    }
-
-    public static void main(String args[]) throws Exception {
-        RSA a = new RSA();
-        PublicKey key = a.getPublicKey();
-
-        String hostname = "localhost";
-        byte[] hostnameBytes = hostname.getBytes();
-
-        int port = 6789;
-
-        TorMessage msg = new TorMessage(Type.CREATE, key);
-        msg.printString();
-
-        TorMessage z = new TorMessage(msg.getBytes(), key.getEncoded().length);
-        z.printString();
-
-        // TorMessage msg = new TorMessage(Type.EXTEND, key, hostname, port);
-        // msg.printString();
-
-        // TorMessage z = new TorMessage(msg.getBytes(), hostnameBytes.length + 4 + key.getEncoded().length);
-        // z.printString();
     }
 
     public byte[] getBytes() {

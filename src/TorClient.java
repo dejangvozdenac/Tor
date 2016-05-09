@@ -12,14 +12,6 @@ import java.nio.ByteBuffer;
 import java.security.Provider;
 import java.security.PublicKey;
 import java.util.*;
-// import java.math.BigInteger;
-// import java.security.*;
-// import java.security.spec.*;
-// import java.security.interfaces.*;
-// import javax.crypto.*;
-// import javax.crypto.spec.*;
-// import javax.crypto.interfaces.*;
-// import com.sun.crypto.provider.SunJCE;
 
 public class TorClient {
     static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
@@ -55,61 +47,37 @@ public class TorClient {
 
         //create buffered readers
         DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
-        BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        InputStream inFromServer = clientSocket.getInputStream();
 
         //do the handshake
         establishSecureConnection(outToServer, inFromServer);
 
-        // manually EXTEND, DATA, TEARDOWN
-        if (DEBUG) {
-            Debug("DEBUG MODE");
+        Debug("AUTOMATIC MODE");
 
-            // get input
-            System.out.printf("Send: ");
-            String sentence = inFromUser.readLine();
+        setupCircuit(outToServer, inFromServer, path);
 
-            while (sentence.length() != 0) {
-                // write to onion router
-                outToServer.writeBytes(sentence + '\n');
+        // get input
+        System.out.printf("file to retrieve: ");
+        String filename = inFromUser.readLine();
 
-                // create read stream and receive from server
-                String sentenceFromServer = inFromServer.readLine();
-                Debug("Received: " + sentenceFromServer);
+        // fetch data
+        while (filename.length() != 0) {
+            // write to target server
+            String url = filenametoURL(serverName, serverPort, filename);
+            retrieveURL(outToServer, inFromServer, url);
 
-                // get more input
-                System.out.printf("Send: ");
-                sentence = inFromUser.readLine();
-            }
-        }
-        // automatically EXTEND, DATA, TEARDOWN
-        else {
-            Debug("AUTOMATIC MODE");
-
-            setupCircuit(outToServer, inFromServer, path);
-
-            // get input
+            // get more input
             System.out.printf("file to retrieve: ");
-            String filename = inFromUser.readLine();
-
-            // fetch data
-            while (filename.length() != 0) {
-                // write to target server
-                String url = filenametoURL(serverName, serverPort, filename);
-                retrieveURL(outToServer, inFromServer, url);
-
-                // get more input
-                System.out.printf("file to retrieve: ");
-                filename = inFromUser.readLine();
-            }
-
-            teardownCircuit(outToServer, inFromServer);
+            filename = inFromUser.readLine();
         }
+
+        teardownCircuit(outToServer, inFromServer);
 
         // close client socket
         clientSocket.close();
     }
 
-    private static void retrieveURL(DataOutputStream outToServer, BufferedReader inFromServer, String url) throws Exception {
+    private static void retrieveURL(DataOutputStream outToServer, InputStream inFromServer, String url) throws Exception {
           TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
         TorMessage encrypted = AESMultipleEncrypt(dataMsg,secretKeys,ONION_SERVER_COUNT);
         outToServer.write(encrypted.getBytes());
@@ -118,19 +86,18 @@ public class TorClient {
         Debug("Received: " + msgFromServer.getPayload());
     }
 
-    private static void teardownCircuit(DataOutputStream outToServer, BufferedReader inFromServer) throws Exception {
+    private static void teardownCircuit(DataOutputStream outToServer, InputStream inFromServer) throws Exception {
         TorMessage teardownMsg = new TorMessage(TorMessage.Type.TEARDOWN);
         outToServer.write(teardownMsg.getBytes());
     }
 
-    private static void establishSecureConnection(DataOutputStream outBuffer, BufferedReader inBuffer) throws Exception {
+    private static void establishSecureConnection(DataOutputStream outBuffer, InputStream inBuffer) throws Exception {
         //find out what the public key is
         TorMessage createMsg = new TorMessage(TorMessage.Type.CREATE, encryption.getPublicKey());
         outBuffer.write(createMsg.getBytes());
-        Debug("Sent: " + createMsg.getString());
+        createMsg.printString();
 
         TorMessage msgFromServer = readMessage(inBuffer);
-        Debug("Received: " + msgFromServer.toString());
         remotePublicKeys[0] = msgFromServer.getPublicKey();
 
         //arrange the aes key
@@ -139,7 +106,7 @@ public class TorClient {
         TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
                 encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[0]));
         outBuffer.write(aesMsg.getBytes());
-        Debug("Sent: " + aesMsg.getString());
+        aesMsg.printString();
 
         TorMessage aesFromServer = readMessage(inBuffer);
         Debug("Received: " + aesFromServer.toString());
@@ -147,7 +114,7 @@ public class TorClient {
                 encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"SHA-1");
     }
 
-    private static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
+    private static void setupCircuit(DataOutputStream outToServer, InputStream inFromServer, List<String> orPath)
             throws Exception {
         for (int i = 1; i < orPath.size(); i++) {
             //get the next hop
@@ -180,9 +147,14 @@ public class TorClient {
         }
     }
 
-    private static TorMessage readMessage(BufferedReader in) throws Exception{
-        int length = Integer.parseInt(in.readLine());
-        char[] msg = new char[length];
+    private static TorMessage readMessage(InputStream in) throws Exception{
+        byte[] intByte = new byte[4];
+        in.read(intByte,0,4);
+        ByteBuffer wrapped = ByteBuffer.wrap(intByte);
+        int length = wrapped.getInt()-4;
+        TorServer.Debug(length+"");
+
+        byte[] msg = new byte[length];
         in.read(msg, 0, length);
         return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
     }
@@ -220,13 +192,13 @@ public class TorClient {
     // takes in list of hostnames and path length
     private static List<String> pickPath(int length, List<String> onionRouters) {
         ArrayList<Integer> list = new ArrayList<Integer>();
-        for (int i=1; i<length; i++) {
+        for (int i=1; i<=length; i++) {
             list.add(new Integer(i));
         }
         Collections.shuffle(list);
         List<String> routers = new ArrayList<String>();
         for(int i=0; i<length; i++){
-            routers.add(onionRouters.get(list.get(i)));
+            routers.add(onionRouters.get(list.get(i)-1));
         }
         return routers;
     }

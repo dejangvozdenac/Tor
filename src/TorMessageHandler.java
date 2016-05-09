@@ -2,6 +2,7 @@
  * Created by dejan on 5/6/16.
  */
 
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.*;
 import java.nio.file.Files;
@@ -15,13 +16,14 @@ import java.security.PublicKey;
 
 class TorMessageHandler implements Runnable{
     private Socket connSocket;
-    private BufferedReader inFromPrevious;
+    private InputStream inFromPrevious;
     private DataOutputStream outToPrevious;
-    private BufferedReader inFromNext;
+    private InputStream inFromNext;
     private DataOutputStream outToNext;
     private boolean entryServer;
     private boolean exitServer;
     private RSA encryption;
+    private SecretKey secretKey;
 
     public void run()
     {
@@ -34,8 +36,7 @@ class TorMessageHandler implements Runnable{
         this.connSocket = connectionSocket;
         this.entryServer = true;
         this.exitServer = true;
-        inFromPrevious = new BufferedReader(
-                new InputStreamReader(connSocket.getInputStream(),"US-ASCII"));
+        inFromPrevious = connSocket.getInputStream();
 
         outToPrevious =
                 new DataOutputStream(connSocket.getOutputStream());
@@ -47,13 +48,14 @@ class TorMessageHandler implements Runnable{
     public void processRequest()
     {
         try {
-            String clientReq="";
-            String nextResponse="";
+            String clientReqLen="";
+            String nextResponseLen="";
             boolean connOpen = true;
             while(connOpen) {
-                if(inFromPrevious.ready()&&(clientReq=inFromPrevious.readLine())!="") {
-                    TorMessage receivedMsg = new TorMessage(clientReq);
-                    TorServer.Debug(receivedMsg.getType()+"--"+receivedMsg.getRemotePublicKey());
+                if(inFromPrevious.available()>0) {
+//                    &&(clientReqLen=inFromPrevious.readLine())!=""
+                    TorMessage receivedMsg = readMessage(inFromPrevious);
+                    receivedMsg.printString();
                     switch (receivedMsg.getType()) {
                         case CREATE:
                             //alocate resources, agree on keytoString
@@ -69,27 +71,26 @@ class TorMessageHandler implements Runnable{
                             Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
                             TorMessage extMessage = new TorMessage(TorMessage.Type.CREATE,"");
                             TorMessage extended = new TorMessage(TorMessage.Type.EXTENDED, "");
-                            inFromNext = new BufferedReader(
-                                    new InputStreamReader(nextTorSocket.getInputStream(), "US-ASCII"));
+                            inFromNext = nextTorSocket.getInputStream();
                             outToNext =
                                     new DataOutputStream(nextTorSocket.getOutputStream());
                             outToNext.write(extMessage.getBytes());
                             outToPrevious.write(extended.getBytes());
                             break;
                         case DATA:
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
+                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getPayload());
                             outToPrevious.write(dataRelay.getBytes());
                             outToPrevious.write("\n".getBytes());
                             break;
                         case BEGIN:
                             if (exitServer) {
-                                String targetURL = receivedMsg.getBeginURL();
+                                String targetURL = receivedMsg.getURL();
                                 String response = getHTML(targetURL);
                                 TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response );
                                 outToPrevious.write(dataResponse.getBytes());
                             } else {
                                 TorMessage beginRelay = new TorMessage(
-                                        TorMessage.Type.BEGIN, receivedMsg.getBeginURL() );
+                                        TorMessage.Type.BEGIN, receivedMsg.getURL() );
                                 outToNext.write(beginRelay.getBytes());
                             }
                             break;
@@ -104,18 +105,16 @@ class TorMessageHandler implements Runnable{
                             outToPrevious.write("Bad Message!\n".getBytes());
                             TorServer.Debug("Bad Message!");
                     }
+                    TorServer.Debug("Response Sent");
                 }
-                if(!exitServer&&inFromNext.ready()&&(nextResponse=inFromNext.readLine())!=""){
-                    TorMessage receivedMsg = new TorMessage(nextResponse);
-                    TorServer.Debug("RELAYING "+receivedMsg.getType());
-                    switch (receivedMsg.getType()) {
-                        default:
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
-                            outToPrevious.write(dataRelay.getBytes());
-                            break;
-//                        default:
-//                            TorServer.Debug("BAD");
-                    }
+                if(!exitServer&&inFromNext.available()>0){
+//                    &&(nextResponseLen=inFromNext.readLine())!=""
+                    TorMessage receivedMsg = readMessage(inFromNext);
+                    TorServer.Debug("RELAYING BACK");
+                    AES enc = new AES();
+                    TorMessage dataRelay = new TorMessage(TorMessage.Type.RELAY,
+                            enc.encrypt(receivedMsg.getPayload(),secretKey));
+                    outToPrevious.write(dataRelay.getBytes());
                 }
             }
             connSocket.close();
@@ -136,5 +135,17 @@ class TorMessageHandler implements Runnable{
         }
         rd.close();
         return result.toString();
+    }
+
+    private static TorMessage readMessage(InputStream in) throws Exception{
+        byte[] intByte = new byte[4];
+        in.read(intByte,0,4);
+        ByteBuffer wrapped = ByteBuffer.wrap(intByte);
+        int length = wrapped.getInt()-4;
+        TorServer.Debug(length+"");
+
+        byte[] msg = new byte[length];
+        in.read(msg, 0, length);
+        return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
     }
 }
