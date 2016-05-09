@@ -61,14 +61,14 @@ class TorMessageHandler implements Runnable{
                                     encryption.getPublicKey());
                             outToPrevious.write(createdMsg.getBytes());
                             break;
-                        case RELAY:
+                        case EXTEND:
                             exitServer = false;
                             String nextTorHost = receivedMsg.getExtendHost();
                             int nextTorPort = receivedMsg.getExtendPort();
                             InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
                             Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
                             TorMessage extMessage = new TorMessage(TorMessage.Type.CREATE,"");
-                            TorMessage extended = new TorMessage(TorMessage.Type.RELAYED, "");
+                            TorMessage extended = new TorMessage(TorMessage.Type.EXTENDED, "");
                             inFromNext = new BufferedReader(
                                     new InputStreamReader(nextTorSocket.getInputStream(), "US-ASCII"));
                             outToNext =
