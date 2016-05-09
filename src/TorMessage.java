@@ -1,3 +1,4 @@
+import javax.crypto.SecretKey;
 import java.security.PublicKey;
 
 /**
@@ -13,6 +14,7 @@ public class TorMessage {
     private int length;
     private Type type;
     private PublicKey publicKey;
+    private SecretKey secretKey;
     private String extendHost;
     private int extendPort;
     private String payload;
@@ -139,5 +141,9 @@ public class TorMessage {
 
     public PublicKey getPublicKey() {
         return publicKey;
+    }
+
+    public SecretKey getSecretKey() {
+        return secretKey;
     }
 }

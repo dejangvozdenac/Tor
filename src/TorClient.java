@@ -121,19 +121,25 @@ public class TorClient {
     }
 
     private static void establishSecureConnection(DataOutputStream outBuffer, BufferedReader inBuffer) throws Exception {
+        //find out what the public key is
         TorMessage createMsg = new TorMessage(TorMessage.Type.CREATE, encryption.getPublicKey());
         outBuffer.write(createMsg.getBytes());
-        System.out.printf("Sent: " + createMsg.getString());
+        Debug("Sent: " + createMsg.getString());
 
         TorMessage msgFromServer = new TorMessage(readMessage(inBuffer));
         Debug("Received: " + msgFromServer.toString());
         remotePublicKeys[0] = msgFromServer.getPublicKey();
 
+        //arrange the aes key
         AES symmetricEncryption = new AES();
 
         TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
                 encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[0]));
-
+        outBuffer.write(aesMsg.getBytes());
+        Debug("Sent: " + aesMsg.getString());
+        TorMessage aesFromServer = new TorMessage(readMessage(inBuffer));
+        Debug("Received: " + aesFromServer.toString());
+        secretKeys[0] = aesFromServer.getSecretKey();
     }
 
     private static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
