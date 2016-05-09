@@ -10,6 +10,8 @@ import java.net.*;
 import java.util.*;
 import java.text.SimpleDateFormat;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
 class TorMessageHandler implements Runnable{
     private Socket connSocket;
@@ -19,6 +21,7 @@ class TorMessageHandler implements Runnable{
     private DataOutputStream outToNext;
     private boolean entryServer;
     private boolean exitServer;
+    private RSA encryption;
 
     public void run()
     {
@@ -37,6 +40,8 @@ class TorMessageHandler implements Runnable{
         outToPrevious =
                 new DataOutputStream(connSocket.getOutputStream());
 
+        encryption = new RSA();
+
     }
 
     public void processRequest()
@@ -51,7 +56,10 @@ class TorMessageHandler implements Runnable{
                     TorServer.Debug(receivedMsg.getType()+"");
                     switch (receivedMsg.getType()) {
                         case CREATE:
-                            //alocate resources, agree on key
+                            //alocate resources, agree on keytoString
+                            TorMessage createdMsg = new TorMessage(TorMessage.Type.CREATED,
+                                    encryption.getPublicKey()+"\n");
+                            outToPrevious.write(createdMsg.getBytes());
                             break;
                         case EXTEND:
                             exitServer = false;
