@@ -146,6 +146,6 @@ class TorMessageHandler implements Runnable{
 
         byte[] msg = new byte[length];
         in.read(msg, 0, length);
-        return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
+        return (new TorMessage(msg,length));
     }
 }
