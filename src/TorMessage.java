@@ -27,6 +27,7 @@ public class TorMessage {
 
     // type EXTEND
     public TorMessage(Type type, PublicKey publicKey, String extendHost, int extendPort) {
+        this.length = 1 + 
         this.type = type;
         this.publicKey = publicKey;
         this.extendHost = extendHost;
@@ -35,18 +36,21 @@ public class TorMessage {
 
     // type DATA
     public TorMessage(Type type, byte[] payload) {
+        this.legnth = 1 + payload.length;
         this.type = type;
         this.payload = payload;
     }
 
     // type BEGIN
     public TorMessage(Type type, String url) {
+        this.length = 1 + url.length();
         this.type = type;
         this.url = url;
     }
 
     // type TEARDOWN
     public TorMessage(Type type) {
+        this.length = 0;
         this.type = type;
     }
 
@@ -99,8 +103,14 @@ public class TorMessage {
     }
 
     public byte[] getBytes() {
-        byte[] toSend = (type + SEPARATOR + body).getBytes();
-        return toSend;
+        byte[] byteRepresentation;
+
+        switch (type) {
+            case "CREATE":
+                break;
+        }
+
+        return byteRepresentation;
     }
 
     public String getString() {
@@ -119,15 +129,15 @@ public class TorMessage {
         return extendHost;
     }
 
-    public String getDataPayload() {
-        return dataPayload;
+    public String getPayload() {
+        return payload;
     }
 
-    public String getBeginURL() {
-        return beginURL;
+    public String getURL() {
+        return url;
     }
 
-    public String getRemotePublicKey() {
-        return remotePublicKey;
+    public String getPublicKey() {
+        return publicKey;
     }
 }
