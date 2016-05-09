@@ -15,6 +15,9 @@ public class AES {
         secretKey = createKey(a, b);
     }
 
+    public AES() throws Exception {
+    }
+
     SecretKey getSecretKey() {
         return secretKey;
     }
@@ -39,22 +42,20 @@ public class AES {
         return secretKeySpec;
     }
 
-    public static byte[] encrypt(String plainText, SecretKey secretKey) throws Exception {
-        byte[] plainTextBytes = plainText.getBytes();
-
+    public static byte[] encrypt(byte[] toEncrypt, SecretKey secretKey) throws Exception {
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.ENCRYPT_MODE, secretKey);
 
-        byte[] encryptedByte = cipher.doFinal(plainTextBytes);
+        byte[] encryptedByte = cipher.doFinal(toEncrypt);
         return encryptedByte;
     }
 
-    public static String decrypt(byte[] encryptedText, SecretKey secretKey) throws Exception {
+    public static byte[] decrypt(byte[] encryptedText, SecretKey secretKey) throws Exception {
         
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.DECRYPT_MODE, secretKey);
 
         byte[] decryptedByte = cipher.doFinal(encryptedText);
-        return new String(decryptedByte);
+        return decryptedByte;
     }
 }

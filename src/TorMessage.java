@@ -51,7 +51,7 @@ public class TorMessage {
         pack();
     }
 
-    // type DATA, AES_REQUEST, AES_RESPONSE
+    // type DATA, AES_REQUEST, AES_RESPONSE, RELAY
     public TorMessage(Type type, byte[] payload) {
         this.length = 4 + 4 + payload.length;
         this.type = type;

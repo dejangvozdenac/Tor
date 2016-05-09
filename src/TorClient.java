@@ -8,6 +8,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.security.Provider;
 import java.security.PublicKey;
 import java.util.*;
@@ -110,10 +111,11 @@ public class TorClient {
 
     private static void retrieveURL(DataOutputStream outToServer, BufferedReader inFromServer, String url) throws Exception {
           TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
-        outToServer.write(dataMsg.getBytes());
+        TorMessage encrypted = AESMultipleEncrypt(dataMsg,secretKeys,ONION_SERVER_COUNT);
+        outToServer.write(encrypted.getBytes());
 
-        String msgFromServer = inFromServer.readLine();
-        Debug("Received: " + msgFromServer);
+        TorMessage msgFromServer = readMessage(inFromServer);
+        Debug("Received: " + msgFromServer.getPayload());
     }
 
     private static void teardownCircuit(DataOutputStream outToServer, BufferedReader inFromServer) throws Exception {
@@ -139,7 +141,7 @@ public class TorClient {
         outBuffer.write(aesMsg.getBytes());
         Debug("Sent: " + aesMsg.getString());
 
-        TorMessage aesFromServer = new TorMessage(readMessage(inBuffer));
+        TorMessage aesFromServer = readMessage(inBuffer);
         Debug("Received: " + aesFromServer.toString());
         secretKeys[0] = new SecretKeySpec(
                 encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"SHA-1");
@@ -148,15 +150,33 @@ public class TorClient {
     private static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
             throws Exception {
         for (int i = 1; i < orPath.size(); i++) {
+            //get the next hop
             String orServerName = orPath.get(i).split(" ")[0];
             int orPort = Integer.parseInt(orPath.get(i).split(" ")[1]);
-
+            //send extend messsage
             TorMessage extendMsg = new TorMessage(TorMessage.Type.EXTEND,encryption.getPublicKey(),orServerName,orPort);
-            System.out.printf("Sent: " + extendMsg.getString());
-            outToServer.write(extendMsg.getBytes());
+            //encrypt and relay it
+            TorMessage encryptedExtend = AESMultipleEncrypt(extendMsg, secretKeys, i);
+            outToServer.write(encryptedExtend.getBytes());
 
-            String msgFromServer = inFromServer.readLine();
-            Debug("Received: " + msgFromServer);
+            //get response back
+            TorMessage extendResponse= readMessage(inFromServer);
+            TorMessage extendDecrypted = AESMultipleDecrypt(extendResponse,secretKeys,i);
+            remotePublicKeys[i] = extendDecrypted.getPublicKey();
+
+            //arrange the aes key
+            AES symmetricEncryption = new AES();
+
+            TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
+                    encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[i]));
+            TorMessage encryptedAES = AESMultipleEncrypt(aesMsg,secretKeys,i);
+            outToServer.write(encryptedAES.getBytes());
+
+            TorMessage aesFromServer = readMessage(inFromServer);
+            TorMessage aesDecrypted = AESMultipleEncrypt(aesFromServer,secretKeys,i);
+            secretKeys[i] = new SecretKeySpec(
+                    encryption.decrypt(aesDecrypted.getPayload(), encryption.getPrivateKey()),"SHA-1");
+
         }
     }
 
@@ -167,14 +187,48 @@ public class TorClient {
         return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
     }
 
+    private static TorMessage AESMultipleEncrypt(TorMessage msg, SecretKey[] keys, int times) throws  Exception{
+        TorMessage previous = msg;
+        TorMessage newMsg;
+        AES encrypt = new AES();
+        for (int i =0; i<times; i++){
+            newMsg=new TorMessage(TorMessage.Type.RELAY,encrypt.encrypt(previous.getBytes(),keys[i]));
+            previous=newMsg;
+        }
+        return previous;
+    }
+
+    private static TorMessage AESMultipleDecrypt(TorMessage msg, SecretKey[] keys, int times) throws Exception{
+        TorMessage previous = msg;
+        TorMessage newMsg;
+        AES encrypt = new AES();
+        for(int i =0; i< times; i++){
+            BufferedReader in = new BufferedReader(new InputStreamReader
+                    (new ByteArrayInputStream(previous.getPayload())));
+            int length = Integer.parseInt(in.readLine());
+            char[] bytes = new char[length];
+            in.read(bytes,0,length);
+            newMsg = new TorMessage(encrypt.decrypt(new String(bytes).getBytes("UTF-8"),keys[times-1-i]),length);
+            previous=newMsg;
+        }
+        return previous;
+    }
     private static String filenametoURL(String serverName, int port, String filename) {
         return "http://" + serverName + ":" + Integer.toString(port) + "/" + filename;
     }
 
-    // TODO: pick randomly, currently picks first "length" number of onion routers    
     // takes in list of hostnames and path length
     private static List<String> pickPath(int length, List<String> onionRouters) {
-        return onionRouters.subList(0, length);
+        ArrayList<Integer> list = new ArrayList<Integer>();
+        for (int i=1; i<length; i++) {
+            list.add(new Integer(i));
+        }
+        Collections.shuffle(list);
+        List<String> routers = new ArrayList<String>();
+        for(int i=0; i<length; i++){
+            routers.add(onionRouters.get(list.get(i)));
+        }
+        return routers;
     }
 
     private static List<String> readRouters(String filename) {
