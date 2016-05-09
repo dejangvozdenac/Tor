@@ -1,8 +1,4 @@
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.security.*;
 import javax.crypto.Cipher;
 
 public class RSA {
@@ -24,7 +20,7 @@ public class RSA {
     }
 
     public static String getPublicKey() {
-        return publicKey.getEncoded().toString();
+        return new String(publicKey.getEncoded());
     }
 
     public static byte[] encrypt(String text, PublicKey key) {

@@ -5,7 +5,7 @@ public class TorMessage {
     private static final String SEPARATOR = "`";
 
     public enum Type {
-        CREATE, CREATED, EXTEND, EXTENDED, BEGIN, DATA, TEARDOWN;
+        CREATE, CREATED, RELAY, RELAYED, BEGIN, DATA, TEARDOWN;
     }
 
     private Type type;
@@ -14,19 +14,23 @@ public class TorMessage {
     private int extendPort;
     private String dataPayload;
     private String beginURL;
+    private String remotePublicKey;
 
 
     //used to construct when sending
     public TorMessage(Type type, String body){
         this.type = type;
-        this.body = body;
+        this.body = body+"\n";
     }
 
     //used to construct when receiving
     public TorMessage(String packedMessage){
         String[] split = packedMessage.split(SEPARATOR);
         this.type = parseType(split[0]);
-        if(type==Type.EXTEND){
+        if(type==Type.CREATE){
+            remotePublicKey = split[1];
+        }
+        else if(type==Type.RELAY){
             extendHost = split[1];
             extendPort = Integer.parseInt(split[2]);
         }
@@ -45,10 +49,10 @@ public class TorMessage {
                 return Type.CREATE;
             case "CREATED":
                 return Type.CREATED;
-            case "EXTEND":
-                return Type.EXTEND;
-            case "EXTENDED":
-                return Type.EXTENDED;
+            case "RELAY":
+                return Type.RELAY;
+            case "RELAYED":
+                return Type.RELAYED;
             case "BEGIN":
                 return Type.BEGIN;
             case "DATA":
@@ -66,7 +70,7 @@ public class TorMessage {
     }
 
     public String getString(){
-        return type+SEPARATOR+body;
+        return type+SEPARATOR+body+"\n";
     }
 
     public Type getType() {
@@ -87,5 +91,9 @@ public class TorMessage {
 
     public String getBeginURL() {
         return beginURL;
+    }
+
+    public String getRemotePublicKey() {
+        return remotePublicKey;
     }
 }

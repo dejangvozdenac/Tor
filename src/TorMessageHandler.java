@@ -53,22 +53,22 @@ class TorMessageHandler implements Runnable{
             while(connOpen) {
                 if(inFromPrevious.ready()&&(clientReq=inFromPrevious.readLine())!="") {
                     TorMessage receivedMsg = new TorMessage(clientReq);
-                    TorServer.Debug(receivedMsg.getType()+"");
+                    TorServer.Debug(receivedMsg.getType()+"--"+receivedMsg.getRemotePublicKey());
                     switch (receivedMsg.getType()) {
                         case CREATE:
                             //alocate resources, agree on keytoString
                             TorMessage createdMsg = new TorMessage(TorMessage.Type.CREATED,
-                                    encryption.getPublicKey()+"\n");
+                                    encryption.getPublicKey());
                             outToPrevious.write(createdMsg.getBytes());
                             break;
-                        case EXTEND:
+                        case RELAY:
                             exitServer = false;
                             String nextTorHost = receivedMsg.getExtendHost();
                             int nextTorPort = receivedMsg.getExtendPort();
                             InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
                             Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
-                            TorMessage extMessage = new TorMessage(TorMessage.Type.CREATE, "\n");
-                            TorMessage extended = new TorMessage(TorMessage.Type.EXTENDED, "\n");
+                            TorMessage extMessage = new TorMessage(TorMessage.Type.CREATE,"");
+                            TorMessage extended = new TorMessage(TorMessage.Type.RELAYED, "");
                             inFromNext = new BufferedReader(
                                     new InputStreamReader(nextTorSocket.getInputStream(), "US-ASCII"));
                             outToNext =
@@ -85,17 +85,17 @@ class TorMessageHandler implements Runnable{
                             if (exitServer) {
                                 String targetURL = receivedMsg.getBeginURL();
                                 String response = getHTML(targetURL);
-                                TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response + "\n");
+                                TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response );
                                 outToPrevious.write(dataResponse.getBytes());
                             } else {
                                 TorMessage beginRelay = new TorMessage(
-                                        TorMessage.Type.BEGIN, receivedMsg.getBeginURL() + "\n");
+                                        TorMessage.Type.BEGIN, receivedMsg.getBeginURL() );
                                 outToNext.write(beginRelay.getBytes());
                             }
                             break;
                         case TEARDOWN:
                             if (!exitServer) {
-                                TorMessage tearDown = new TorMessage(TorMessage.Type.TEARDOWN, "\n");
+                                TorMessage tearDown = new TorMessage(TorMessage.Type.TEARDOWN, "");
                                 outToNext.write(tearDown.getBytes());
                             }
                             connOpen = false;
@@ -109,12 +109,12 @@ class TorMessageHandler implements Runnable{
                     TorMessage receivedMsg = new TorMessage(nextResponse);
                     TorServer.Debug("RELAYING "+receivedMsg.getType());
                     switch (receivedMsg.getType()) {
-                        case DATA:
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload()+"\n");
+                        default:
+                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getDataPayload());
                             outToPrevious.write(dataRelay.getBytes());
                             break;
-                        default:
-                            TorServer.Debug("BAD");
+//                        default:
+//                            TorServer.Debug("BAD");
                     }
                 }
             }
