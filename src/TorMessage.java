@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
  * Created by dejan on 5/6/16.
  */
 public class TorMessage {
+    final static SERVER_NAME_MAX_LEN = 19;
+
     public enum Type {
         CREATE,
         CREATED,
@@ -27,6 +29,7 @@ public class TorMessage {
     private int extendPort;
     private byte[] payload;
     private String url;
+    private byte[] bytes;
 
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
@@ -34,6 +37,7 @@ public class TorMessage {
         this.length = 4 + 4 + publicKey.getEncoded().length;
         this.type = type;
         this.publicKey = publicKey;
+        pack();
     }
 
     // type EXTEND
@@ -43,6 +47,7 @@ public class TorMessage {
         this.publicKey = publicKey;
         this.extendHost = extendHost;
         this.extendPort = extendPort;
+        pack();
     }
 
     // type DATA, AES_REQUEST, AES_RESPONSE
@@ -50,6 +55,7 @@ public class TorMessage {
         this.length = 4 + 4 + payload.length;
         this.type = type;
         this.payload = payload;
+        pack();
     }
 
     // type BEGIN
@@ -57,64 +63,57 @@ public class TorMessage {
         this.length = 4 + 4 + url.length();
         this.type = type;
         this.url = url;
+        pack();
     }
 
     // type TEARDOWN
     public TorMessage(Type type) {
         this.length = 4 + 4;
         this.type = type;
+        pack();
     }
 
     // used to construct when receiving
     public TorMessage(byte[] packedMessage, int length) {
-        String[] split = packedMessage.split(SEPARATOR);
-        this.type = parseType(split[0]);
-        if(type==Type.CREATE){
-            remotePublicKey = split[1];
-        }
-        else if(type==Type.EXTEND){
-            extendHost = split[1];
-            extendPort = Integer.parseInt(split[2]);
-        }
-        else if(type==Type.DATA){
-            dataPayload=split[1];
-        }
-        else if(type==Type.BEGIN){
-            beginURL=split[1];
-        }
-        this.body = "\n";
-    }
+        packedMessage = ByteBuffer.wrap(packedMessage);
 
-    public static Type parseType(String s) {
-        switch (s) {
-            case "CREATE":
-                return Type.CREATE;
-                // type publickey
-            case "CREATED":
-                return Type.CREATED;
-                // type publickey
-            case "EXTEND":
-                return Type.EXTEND;
-                // type nextserverport nextservername publickey
-            case "EXTENDED":
-                return Type.EXTENDED;
-                // type publickey
-            case "BEGIN":
-                return Type.BEGIN;
-                // type payload
-            case "DATA":
-                return Type.DATA;
-                // type payload
-            case "TEARDOWN":
-                return Type.TEARDOWN;
-                // type
-            default:
-                return Type.BEGIN; //TODO handle this error better
+        type = packedMessage.getInt();
+
+        switch (type) {
+            case Type.CREATE:
+            case Type.CREATED:
+            case Type.EXTENDED:
+                byte[] publicKeyBytes = new byte[length];
+                packedMessage.get(publicKeyBytes, 0, length);
+
+                // TODO: how to change publickey back from bytes?
+                // PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                break;
+
+            case Type.BEGIN:
+            case Type.DATA:
+                byte[] payloadBytes = new byte[length];
+                packedMessage.get(payloadBytes, 0, length);
+                break;
+
+            case Type.EXTEND:
+                byte[] serverNameBytes = new byte[SERVER_NAME_MAX_LEN];
+                packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN);
+                
+                String extendHostJunk = new String(serverNameBytes);
+                extendHost = extendHostJunk.split(" ");
+
+                extendPort = packedMessage.getInt();
+
+                byte[] publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN];
+                packedMessage.get(publicKeyBytes, 0, length - 4 - SERVER_NAME_MAX_LEN);
+                // TODO: how to change publickey back from bytes?
+                // PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                break;
         }
     }
 
-    public ByteBuffer[] getBytes() {
-        // TODO: put this in initialization
+    private void pack() {
         ByteBuffer[] bytes = new ByteBuffer[length];
 
         bytes.putInt(length);
@@ -132,7 +131,7 @@ public class TorMessage {
                 int start = bytes.position;
 
                 bytes.put((extendHost + " ").getBytes());
-                bytes.putInt(extendPort, start + 20); // padding host
+                bytes.putInt(extendPort, start + SERVER_NAME_MAX_LEN + 1); // padding host
                 bytes.put(publicKey.getEncoded());
                 break;
             case Type.BEGIN:
@@ -140,7 +139,9 @@ public class TorMessage {
                 bytes.put(payload);
                 break;
         }
+    }
 
+    public ByteBuffer[] getBytes() {
         return bytes;
     }
 
