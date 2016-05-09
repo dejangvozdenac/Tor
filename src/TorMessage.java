@@ -10,43 +10,48 @@ public class TorMessage {
         CREATE, CREATED, EXTEND, EXTENDED, RELAY, RELAYED, BEGIN, DATA, TEARDOWN;
     }
 
+    private int length;
     private Type type;
-    private String body;
+    private PublicKey publicKey;
     private String extendHost;
     private int extendPort;
-    private String dataPayload;
-    private String beginURL;
-    private String remotePublicKey;
-
+    private String payload;
+    private String url;
 
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
     public TorMessage(Type type, PublicKey publicKey) {
-        
+        this.type = type;
+        this.publicKey = publicKey;
     }
 
     // type EXTEND
-    public TorMessage(Type type, PublicKey publicKey, String nextServerName, int nextServerPort) {
-        
+    public TorMessage(Type type, PublicKey publicKey, String extendHost, int extendPort) {
+        this.type = type;
+        this.publicKey = publicKey;
+        this.extendHost = extendHost;
+        this.extendPort = extendPort;
     }
 
     // type DATA
     public TorMessage(Type type, byte[] payload) {
-        
+        this.type = type;
+        this.payload = payload;
     }
 
     // type BEGIN
     public TorMessage(Type type, String url) {
-        
+        this.type = type;
+        this.url = url;
     }
 
     // type TEARDOWN
     public TorMessage(Type type) {
-        
+        this.type = type;
     }
 
-    //used to construct when receiving
-    public TorMessage(String packedMessage) {
+    // used to construct when receiving
+    public TorMessage(byte[] packedMessage) {
         String[] split = packedMessage.split(SEPARATOR);
         this.type = parseType(split[0]);
         if(type==Type.CREATE){
@@ -65,8 +70,8 @@ public class TorMessage {
         this.body = "\n";
     }
 
-    public static Type parseType(String s){
-        switch(s){
+    public static Type parseType(String s) {
+        switch (s) {
             case "CREATE":
                 return Type.CREATE;
                 // type publickey
@@ -93,13 +98,13 @@ public class TorMessage {
         }
     }
 
-    public byte[] getBytes(){
-        byte[] toSend=(type+SEPARATOR+body).getBytes();
+    public byte[] getBytes() {
+        byte[] toSend = (type + SEPARATOR + body).getBytes();
         return toSend;
     }
 
-    public String getString(){
-        return type+SEPARATOR+body+"\n";
+    public String getString() {
+        return type + SEPARATOR + body + "\n";
     }
 
     public Type getType() {
