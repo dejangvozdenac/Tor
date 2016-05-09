@@ -1,13 +1,22 @@
 import java.security.PublicKey;
+import java.nio.ByteBuffer;
 
 /**
  * Created by dejan on 5/6/16.
  */
 public class TorMessage {
-    private static final String SEPARATOR = "`";
-
     public enum Type {
-        CREATE, CREATED, AES_REQUEST, AES_RESPONSE, EXTEND, EXTENDED, RELAY, RELAYED, BEGIN, DATA, TEARDOWN;
+        CREATE,
+        CREATED,
+        AES_REQUEST,
+        AES_RESPONSE,
+        EXTEND,
+        EXTENDED,
+        RELAY,
+        RELAYED,
+        BEGIN,
+        DATA,
+        TEARDOWN;
     }
 
     private int length;
@@ -21,14 +30,14 @@ public class TorMessage {
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
     public TorMessage(Type type, PublicKey publicKey) {
-        this.length = 1 + publicKey.getEncoded().length;
+        this.length = 4 + 4 + publicKey.getEncoded().length;
         this.type = type;
         this.publicKey = publicKey;
     }
 
     // type EXTEND
     public TorMessage(Type type, PublicKey publicKey, String extendHost, int extendPort) {
-        this.length = 1 + publicKey.getEncoded().length + extendHost.getBytes().length + 4;
+        this.length = 4 + 4 + publicKey.getEncoded().length + extendHost.getBytes().length + 4;
         this.type = type;
         this.publicKey = publicKey;
         this.extendHost = extendHost;
@@ -37,26 +46,26 @@ public class TorMessage {
 
     // type DATA, AES_REQUEST, AES_RESPONSE
     public TorMessage(Type type, byte[] payload) {
-        this.length = 1 + payload.length;
+        this.length = 4 + 4 + payload.length;
         this.type = type;
         this.payload = payload;
     }
 
     // type BEGIN
     public TorMessage(Type type, String url) {
-        this.length = 1 + url.length();
+        this.length = 4 + 4 + url.length();
         this.type = type;
         this.url = url;
     }
 
     // type TEARDOWN
     public TorMessage(Type type) {
-        this.length = 0;
+        this.length = 4 + 4;
         this.type = type;
     }
 
     // used to construct when receiving
-    public TorMessage(byte[] packedMessage) {
+    public TorMessage(byte[] packedMessage, int length) {
         String[] split = packedMessage.split(SEPARATOR);
         this.type = parseType(split[0]);
         if(type==Type.CREATE){
@@ -85,7 +94,7 @@ public class TorMessage {
                 // type publickey
             case "EXTEND":
                 return Type.EXTEND;
-                // type nextservername nextserverport publickey
+                // type nextserverport nextservername publickey
             case "EXTENDED":
                 return Type.EXTENDED;
                 // type publickey
@@ -103,15 +112,35 @@ public class TorMessage {
         }
     }
 
-    public byte[] getBytes() {
-        byte[] byteRepresentation = ;
+    public ByteBuffer[] getBytes() {
+        // TODO: put this in initialization
+        ByteBuffer[] bytes = new ByteBuffer[length];
+
+        bytes.putInt(length);
+        bytes.putInt(type);
 
         switch (type) {
-            case "CREATE":
+            case Type.CREATE:
+            case Type.CREATED:
+                bytes.put(publicKey.getEncoded());
+                break;
+            case Type.EXTENDED:
+                bytes.put(publicKey.getEncoded());
+                break;
+            case Type.EXTEND:
+                int start = bytes.position;
+
+                bytes.put((extendHost + " ").getBytes());
+                bytes.putInt(extendPort, start + 20); // padding host
+                bytes.put(publicKey.getEncoded());
+                break;
+            case Type.BEGIN:
+            case Type.DATA:
+                bytes.put(payload);
                 break;
         }
 
-        return byteRepresentation;
+        return bytes;
     }
 
     public String getString() {
