@@ -243,7 +243,12 @@ public class TorMessage {
     }
 
     public byte[] getPayload() {
-        return payload;
+        if(payload==null){
+            return new byte[0];
+        }
+        else {
+            return payload;
+        }
     }
 
     public String getURL() {

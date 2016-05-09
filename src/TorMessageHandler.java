@@ -110,7 +110,7 @@ class TorMessageHandler implements Runnable{
                             outToPrevious.write(aesResponse.getBytes());
                             break;
                         default:
-                            TorServer.Debug("Bad Message!");
+                            TorServer.Debug(receivedMsg.getType()+"- not handled");
                     }
                     TorServer.Debug("Processed Request");
                 }

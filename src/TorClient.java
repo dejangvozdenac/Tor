@@ -109,7 +109,7 @@ public class TorClient {
         TorMessage aesFromServer = readMessage(inBuffer);
         Debug("Received: " + aesFromServer.toString());
         secretKeys[0] = new SecretKeySpec(
-                encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"SHA-1");
+                encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"AES");
     }
 
     private static void setupCircuit(DataOutputStream outToServer, InputStream inFromServer, List<String> orPath)
@@ -140,7 +140,7 @@ public class TorClient {
             TorMessage aesFromServer = readMessage(inFromServer);
             TorMessage aesDecrypted = AESMultipleEncrypt(aesFromServer,secretKeys,i);
             secretKeys[i] = new SecretKeySpec(
-                    encryption.decrypt(aesDecrypted.getPayload(), encryption.getPrivateKey()),"SHA-1");
+                    encryption.decrypt(aesDecrypted.getPayload(), encryption.getPrivateKey()),"AES");
 
         }
     }
