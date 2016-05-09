@@ -2,6 +2,7 @@ import javax.crypto.SecretKey;
 import java.security.PublicKey;
 import java.nio.ByteBuffer;
 import java.security.spec.X509EncodedKeySpec;
+import java.security.KeyFactory;
 
 /**
  * Created by dejan on 5/6/16.
@@ -10,17 +11,54 @@ public class TorMessage {
     final static int SERVER_NAME_MAX_LEN = 19;
 
     public enum Type {
-        CREATE,
-        CREATED,
-        AES_REQUEST,
-        AES_RESPONSE,
-        EXTEND,
-        EXTENDED,
-        RELAY,
-        RELAYED,
-        BEGIN,
-        DATA,
-        TEARDOWN;
+        CREATE(0),
+        CREATED(1),
+        AES_REQUEST(2),
+        AES_RESPONSE(3),
+        EXTEND(4),
+        EXTENDED(5),
+        RELAY(6),
+        RELAYED(7),
+        BEGIN(8),
+        DATA(9),
+        TEARDOWN(10);
+
+        private final int id;
+
+        Type(int id) {
+            this.id = id;
+        }
+
+        int toInt() {
+            return id;
+        }
+
+        static Type toEnum(int id) {
+            switch (id) {
+                case 0:
+                    return Type.CREATE;
+                case 1:
+                    return Type.CREATED;
+                case 2:
+                    return Type.AES_REQUEST;
+                case 3:
+                    return Type.AES_RESPONSE;
+                case 4:
+                    return Type.EXTEND;
+                case 5:
+                    return Type.EXTENDED;
+                case 6:
+                    return Type.RELAY;
+                case 7:
+                    return Type.RELAYED;
+                case 8:
+                    return Type.BEGIN;
+                case 9:
+                    return Type.DATA;
+                case 10:
+                    return Type.TEARDOWN;
+            }
+        }
     }
 
     private int length;
@@ -30,7 +68,7 @@ public class TorMessage {
     private int extendPort;
     private byte[] payload;
     private String url;
-    private byte[] bytes;
+    private ByteBuffer bytes;
 
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
@@ -78,16 +116,18 @@ public class TorMessage {
     public TorMessage(byte[] packedMessageBytes, int length) {
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
-        type = packedMessage.getInt();
+        int typeInt = packedMessage.getInt();
+        // type = 
 
+        byte[] publicKeyBytes;
         switch (type) {
             case CREATE:
             case CREATED:
             case EXTENDED:
-                byte[] publicKeyBytes = new byte[length];
+                publicKeyBytes = new byte[length];
                 packedMessage.get(publicKeyBytes, 0, length);
 
-                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
                 break;
 
             case BEGIN:
@@ -101,22 +141,22 @@ public class TorMessage {
                 packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN);
                 
                 String extendHostJunk = new String(serverNameBytes);
-                extendHost = extendHostJunk.split(" ");
+                extendHost = extendHostJunk.split(" ")[0];
 
                 extendPort = packedMessage.getInt();
 
-                byte[] publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN];
+                publicKeyBytes = new byte[length - 4 - SERVER_NAME_MAX_LEN];
                 packedMessage.get(publicKeyBytes, 0, length - 4 - SERVER_NAME_MAX_LEN);
-                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes));
                 break;
         }
     }
 
     private void pack() {
-        ByteBuffer[] bytes = new ByteBuffer[length];
+        ByteBuffer bytes = ByteBuffer.allocate(length);
 
         bytes.putInt(length);
-        bytes.putInt(type);
+        bytes.putInt(type.toInt());
 
         switch (type) {
             case CREATE:
@@ -127,7 +167,7 @@ public class TorMessage {
                 bytes.put(publicKey.getEncoded());
                 break;
             case EXTEND:
-                int start = bytes.position;
+                int start = bytes.position();
 
                 bytes.put((extendHost + " ").getBytes());
                 bytes.putInt(extendPort, start + SERVER_NAME_MAX_LEN + 1); // padding host
@@ -141,7 +181,8 @@ public class TorMessage {
     }
 
     public byte[] getBytes() {
-        return ByteBuffer.wrap(bytes);
+        byte[] byteRepr = new byte[bytes.capacity()];
+        return bytes.get(byteRepr, 0, byteRepr.length);;
     }
 
     // for debugging purposes
