@@ -76,7 +76,7 @@ public class TorMessage {
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
     public TorMessage(Type type, PublicKey publicKey) {
-        this.length = 4 + 1 + 4 + publicKey.getEncoded().length;
+        this.length = 4 + 4 + publicKey.getEncoded().length;
         this.type = type;
         this.publicKey = publicKey;
         pack();
@@ -84,7 +84,7 @@ public class TorMessage {
 
     // type EXTEND
     public TorMessage(Type type, PublicKey publicKey, String extendHost, int extendPort) {
-        this.length = 4 + 1 + 4 + publicKey.getEncoded().length + SERVER_NAME_MAX_LEN + 1 + 4;
+        this.length = 4 + 4 + publicKey.getEncoded().length + SERVER_NAME_MAX_LEN + 1 + 4;
         this.type = type;
         this.publicKey = publicKey;
         this.extendHost = extendHost;
@@ -94,7 +94,7 @@ public class TorMessage {
 
     // type DATA, AES_REQUEST, AES_RESPONSE, RELAY
     public TorMessage(Type type, byte[] payload) {
-        this.length = 4 + 1 + 4 + payload.length;
+        this.length = 4 + 4 + payload.length;
         this.type = type;
         this.payload = payload;
         pack();
@@ -102,7 +102,7 @@ public class TorMessage {
 
     // type BEGIN
     public TorMessage(Type type, String url) {
-        this.length = 4 + 1 + 4 + url.length();
+        this.length = 4 + 4 + url.length();
         this.type = type;
         this.url = url;
         pack();
@@ -110,7 +110,7 @@ public class TorMessage {
 
     // type TEARDOWN
     public TorMessage(Type type) {
-        this.length = 4 + 1 + 4;
+        this.length = 4 + 2 + 4;
         this.type = type;
         pack();
     }
@@ -121,7 +121,7 @@ public class TorMessage {
         // bytes = ByteBuffer.allocate(length);
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
-        this.length = packedMessage.getInt();
+        this.length = length;
         int typeInt = packedMessage.getInt();
         type = Type.toEnum(typeInt);
 
@@ -164,7 +164,6 @@ public class TorMessage {
         bytes = ByteBuffer.allocate(length);
 
         bytes.putInt(length);
-        bytes.putChar("\n");
         bytes.putInt(type.toInt());
 
         switch (type) {
