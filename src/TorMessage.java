@@ -120,9 +120,6 @@ public class TorMessage {
     public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
-        // TODO: REMOVE THIS:
-        int dummy = packedMessage.getInt();
-
         this.length = length;
         int typeInt = packedMessage.getInt();
         type = Type.toEnum(typeInt);
@@ -132,8 +129,8 @@ public class TorMessage {
             case CREATE:
             case CREATED:
             case EXTENDED:
-                publicKeyBytes = new byte[length];
-                packedMessage.get(publicKeyBytes, 0, length);
+                publicKeyBytes = new byte[length - 4];
+                packedMessage.get(publicKeyBytes, 0, length - 4);
 
                 publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
                 break;
@@ -142,8 +139,8 @@ public class TorMessage {
             case DATA:
             case AES_REQUEST:
             case AES_RESPONSE:
-                payload = new byte[length];
-                packedMessage.get(payload, 0, length);
+                payload = new byte[length - 4];
+                packedMessage.get(payload, 0, length - 4);
                 break;
 
             case EXTEND:
