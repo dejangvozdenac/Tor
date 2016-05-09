@@ -40,7 +40,7 @@ public class RSA {
         return cipherText;
       }
 
-    public static String decrypt(byte[] text, PrivateKey key) {
+    public static byte[] decrypt(byte[] text, PrivateKey key) {
         byte[] dectyptedText = null;
 
         try {
@@ -55,6 +55,6 @@ public class RSA {
           ex.printStackTrace();
         }
 
-        return new String(dectyptedText);
+        return dectyptedText;
     }
 }

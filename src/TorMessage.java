@@ -14,7 +14,6 @@ public class TorMessage {
     private int length;
     private Type type;
     private PublicKey publicKey;
-    private SecretKey secretKey;
     private String extendHost;
     private int extendPort;
     private byte[] payload;
@@ -58,7 +57,7 @@ public class TorMessage {
     }
 
     // used to construct when receiving
-    public TorMessage(byte[] packedMessage) {
+    public TorMessage(byte[] packedMessage, int length) {
         String[] split = packedMessage.split(SEPARATOR);
         this.type = parseType(split[0]);
         if(type==Type.CREATE){
@@ -142,9 +141,5 @@ public class TorMessage {
 
     public PublicKey getPublicKey() {
         return publicKey;
-    }
-
-    public SecretKey getSecretKey() {
-        return secretKey;
     }
 }

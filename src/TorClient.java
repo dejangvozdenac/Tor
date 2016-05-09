@@ -5,6 +5,7 @@
  */
 
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.*;
 import java.security.Provider;
@@ -126,7 +127,7 @@ public class TorClient {
         outBuffer.write(createMsg.getBytes());
         Debug("Sent: " + createMsg.getString());
 
-        TorMessage msgFromServer = new TorMessage(readMessage(inBuffer));
+        TorMessage msgFromServer = readMessage(inBuffer);
         Debug("Received: " + msgFromServer.toString());
         remotePublicKeys[0] = msgFromServer.getPublicKey();
 
@@ -137,9 +138,11 @@ public class TorClient {
                 encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[0]));
         outBuffer.write(aesMsg.getBytes());
         Debug("Sent: " + aesMsg.getString());
+
         TorMessage aesFromServer = new TorMessage(readMessage(inBuffer));
         Debug("Received: " + aesFromServer.toString());
-        secretKeys[0] = aesFromServer.getSecretKey();
+        secretKeys[0] = new SecretKeySpec(
+                encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"SHA-1");
     }
 
     private static void setupCircuit(DataOutputStream outToServer, BufferedReader inFromServer, List<String> orPath)
@@ -148,7 +151,7 @@ public class TorClient {
             String orServerName = orPath.get(i).split(" ")[0];
             int orPort = Integer.parseInt(orPath.get(i).split(" ")[1]);
 
-            TorMessage extendMsg = new TorMessage(TorMessage.Type.RELAY,encryption.getPublicKey(),orServerName,orPort);
+            TorMessage extendMsg = new TorMessage(TorMessage.Type.EXTEND,encryption.getPublicKey(),orServerName,orPort);
             System.out.printf("Sent: " + extendMsg.getString());
             outToServer.write(extendMsg.getBytes());
 
@@ -157,11 +160,11 @@ public class TorClient {
         }
     }
 
-    private static byte[] readMessage(BufferedReader in) throws Exception{
+    private static TorMessage readMessage(BufferedReader in) throws Exception{
         int length = Integer.parseInt(in.readLine());
         char[] msg = new char[length];
         in.read(msg, 0, length);
-        return (new String(msg).getBytes("UTF-8"));
+        return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
     }
 
     private static String filenametoURL(String serverName, int port, String filename) {
