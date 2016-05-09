@@ -30,7 +30,7 @@ public class AES {
     }
 
     public static SecretKey createKey(byte[] a, byte[] b) {
-        if (a.length != 64 || b.length != 64) {
+        if (a.length != 8 || b.length != 8) {
             System.err.println("can't create key");
         }
 

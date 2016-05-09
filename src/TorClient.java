@@ -15,7 +15,7 @@ import java.util.*;
 
 public class TorClient {
     static boolean DEBUG = false; // if false, then automatically sets up and tears down circuit
-    private static final int ONION_SERVER_COUNT = 1;
+    private static final int ONION_SERVER_COUNT = 2;
     private static RSA encryption;
     private static PublicKey[] remotePublicKeys = new PublicKey[ONION_SERVER_COUNT];
     private static SecretKey[] secretKeys = new SecretKey[ONION_SERVER_COUNT];
@@ -95,7 +95,6 @@ public class TorClient {
         //find out what the public key is
         TorMessage createMsg = new TorMessage(TorMessage.Type.CREATE, encryption.getPublicKey());
         outBuffer.write(createMsg.getBytes());
-        createMsg.printString();
 
         TorMessage msgFromServer = readMessage(inBuffer);
         remotePublicKeys[0] = msgFromServer.getPublicKey();
@@ -104,9 +103,8 @@ public class TorClient {
         AES symmetricEncryption = new AES();
 
         TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
-                encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[0]));
+                encryption.encrypt(symmetricEncryption.createHalf(),remotePublicKeys[0]));
         outBuffer.write(aesMsg.getBytes());
-        aesMsg.printString();
 
         TorMessage aesFromServer = readMessage(inBuffer);
         Debug("Received: " + aesFromServer.toString());
@@ -135,7 +133,7 @@ public class TorClient {
             AES symmetricEncryption = new AES();
 
             TorMessage aesMsg = new TorMessage(TorMessage.Type.AES_REQUEST,
-                    encryption.encrypt(new String(symmetricEncryption.createHalf(),"UTF-8"),remotePublicKeys[i]));
+                    encryption.encrypt(symmetricEncryption.createHalf(),remotePublicKeys[i]));
             TorMessage encryptedAES = AESMultipleEncrypt(aesMsg,secretKeys,i);
             outToServer.write(encryptedAES.getBytes());
 
@@ -147,24 +145,23 @@ public class TorClient {
         }
     }
 
-    private static TorMessage readMessage(InputStream in) throws Exception{
+    public static TorMessage readMessage(InputStream in) throws Exception{
         byte[] intByte = new byte[4];
         in.read(intByte,0,4);
         ByteBuffer wrapped = ByteBuffer.wrap(intByte);
         int length = wrapped.getInt()-4;
-        TorServer.Debug(length+"");
 
         byte[] msg = new byte[length];
         in.read(msg, 0, length);
-        return (new TorMessage(new String(msg).getBytes("UTF-8"),length));
+        return (new TorMessage(msg,length));
     }
 
     private static TorMessage AESMultipleEncrypt(TorMessage msg, SecretKey[] keys, int times) throws  Exception{
         TorMessage previous = msg;
         TorMessage newMsg;
-        AES encrypt = new AES();
+        AES aesEncrypt = new AES();
         for (int i =0; i<times; i++){
-            newMsg=new TorMessage(TorMessage.Type.RELAY,encrypt.encrypt(previous.getBytes(),keys[i]));
+            newMsg=new TorMessage(TorMessage.Type.RELAY,aesEncrypt.encrypt(previous.getPayload(),keys[i]));
             previous=newMsg;
         }
         return previous;
