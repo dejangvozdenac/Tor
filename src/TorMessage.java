@@ -1,3 +1,5 @@
+import java.security.PublicKey;
+
 /**
  * Created by dejan on 5/6/16.
  */
@@ -28,8 +30,13 @@ public class TorMessage {
         
     }
 
-    // type BEGIN, DATA
+    // type DATA
     public TorMessage(Type type, byte[] payload) {
+        
+    }
+
+    // type BEGIN
+    public TorMessage(Type type, String url) {
         
     }
 
