@@ -58,6 +58,7 @@ public class TorMessage {
                 case 10:
                     return Type.TEARDOWN;
                 default:
+                    System.out.println("BAD: " + Integer.toString(id));
                     return Type.BEGIN; // TODO: BAD
             }
         }
@@ -65,12 +66,12 @@ public class TorMessage {
 
     private int length;
     private Type type;
-    private PublicKey publicKey;
-    private String extendHost;
-    private int extendPort;
-    private byte[] payload;
-    private String url;
-    private ByteBuffer bytes;
+    private PublicKey publicKey = null;
+    private String extendHost = null;
+    private int extendPort = 0;
+    private byte[] payload = null;
+    private String url = null;
+    private ByteBuffer bytes = null;
 
     //used to construct when sending
     // type CREATE, CREATED, EXTENDED
@@ -115,11 +116,14 @@ public class TorMessage {
     }
 
     // used to construct when receiving
+    // TODO: don't actually need to pass in length right now
     public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
+        // bytes = ByteBuffer.allocate(length);
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
 
+        this.length = packedMessage.getInt();
         int typeInt = packedMessage.getInt();
-        // type = 
+        type = Type.toEnum(typeInt);
 
         byte[] publicKeyBytes;
         switch (type) {
@@ -134,8 +138,10 @@ public class TorMessage {
 
             case BEGIN:
             case DATA:
-                byte[] payloadBytes = new byte[length];
-                packedMessage.get(payloadBytes, 0, length);
+            case AES_REQUEST:
+            case AES_RESPONSE:
+                payload = new byte[length];
+                packedMessage.get(payload, 0, length);
                 break;
 
             case EXTEND:
@@ -155,7 +161,7 @@ public class TorMessage {
     }
 
     private void pack() {
-        ByteBuffer bytes = ByteBuffer.allocate(length);
+        bytes = ByteBuffer.allocate(length);
 
         bytes.putInt(length);
         bytes.putInt(type.toInt());
@@ -163,8 +169,6 @@ public class TorMessage {
         switch (type) {
             case CREATE:
             case CREATED:
-                bytes.put(publicKey.getEncoded());
-                break;
             case EXTENDED:
                 bytes.put(publicKey.getEncoded());
                 break;
@@ -177,26 +181,60 @@ public class TorMessage {
                 break;
             case BEGIN:
             case DATA:
+            case AES_REQUEST:
+            case AES_RESPONSE:
                 bytes.put(payload);
                 break;
         }
     }
 
+    // public static void main(String args[]) throws Exception {
+    //     RSA a = new RSA();
+    //     PublicKey key = a.getPublicKey();
+
+    //     String hostname = "localhost";
+    //     byte[] hostnameBytes = hostname.getBytes();
+
+    //     int port = 6789;
+
+    //     TorMessage msg = new TorMessage(Type.EXTEND, key, hostname, port);
+    //     msg.printString();
+
+    //     TorMessage z = new TorMessage(msg.getBytes(), hostnameBytes.length + 4 + key.getEncoded().length);
+    //     z.printString();
+    // }
+
     public byte[] getBytes() {
         byte[] byteRepr = new byte[bytes.capacity()];
+        bytes.flip();
         bytes.get(byteRepr, 0, byteRepr.length);
         return byteRepr; 
     }
 
     // for debugging purposes
-    public String getString() {
-        return "length: " + Integer.toString(length) +
-               " type: " + type + 
-               " publicKey (don't trust) " + publicKey.toString() + 
-               " host: " + extendHost +
-               " port: " + Integer.toString(extendPort) + 
-               " payload: " + new String(payload) + 
-               " url: " + url;
+    public void printString() {
+        System.out.println("length: " + Integer.toString(length));
+        System.out.println("type: " + type);
+
+        if (publicKey != null) {
+            System.out.println("publicKey: " + publicKey.toString());
+        }
+
+        if (extendHost != null) {
+            System.out.println("host: " + extendHost);   
+        }
+
+        if (extendPort != 0) {
+            System.out.println("port: " + Integer.toString(extendPort));
+        }
+
+        if (payload != null) {
+            System.out.println("payload: " + new String(payload));
+        }
+
+        if (url != null) {
+            System.out.println("url: " + url);
+        }
     }
 
     public Type getType() {
