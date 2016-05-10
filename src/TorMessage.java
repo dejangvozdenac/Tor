@@ -69,7 +69,7 @@ public class TorMessage {
     private PublicKey publicKey = null;
     private String extendHost = null;
     private int extendPort = 0;
-    private byte[] payload = null;
+    private byte[] payload = new byte[0];
     private String url = null;
     private ByteBuffer bytes = null;
 
@@ -137,6 +137,7 @@ public class TorMessage {
 
             case BEGIN:
             case DATA:
+            case RELAY:
             case AES_REQUEST:
             case AES_RESPONSE:
                 payload = new byte[length - 4];
@@ -184,6 +185,7 @@ public class TorMessage {
                 break;
             case BEGIN:
             case DATA:
+            case RELAY:
             case AES_REQUEST:
             case AES_RESPONSE:
                 bytes.put(payload);
@@ -196,7 +198,8 @@ public class TorMessage {
         
         // read
         bytes.flip();
-
+        System.out.println(bytes.capacity() + ":" + byteRepr.length);
+        System.out.println(bytes.position());
         bytes.get(byteRepr, 0, byteRepr.length);
 
         // go back to writing
@@ -243,12 +246,7 @@ public class TorMessage {
     }
 
     public byte[] getPayload() {
-        if(payload==null){
-            return new byte[0];
-        }
-        else {
-            return payload;
-        }
+        return payload;
     }
 
     public String getURL() {

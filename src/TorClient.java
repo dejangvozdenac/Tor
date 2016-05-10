@@ -158,11 +158,13 @@ public class TorClient {
 
     private static TorMessage AESMultipleEncrypt(TorMessage msg, SecretKey[] keys, int times) throws  Exception{
         TorMessage previous = msg;
+        previous.printString();
         TorMessage newMsg;
         AES aesEncrypt = new AES();
         for (int i =0; i<times; i++){
-            newMsg=new TorMessage(TorMessage.Type.RELAY,aesEncrypt.encrypt(previous.getPayload(),keys[i]));
+            newMsg=new TorMessage(TorMessage.Type.RELAY,aesEncrypt.encrypt(previous.getBytes(),keys[i]));
             previous=newMsg;
+            previous.printString();
         }
         return previous;
     }
@@ -177,7 +179,7 @@ public class TorClient {
             int length = Integer.parseInt(in.readLine());
             char[] bytes = new char[length];
             in.read(bytes,0,length);
-            newMsg = new TorMessage(encrypt.decrypt(new String(bytes).getBytes("UTF-8"),keys[times-1-i]),length);
+            newMsg = new TorMessage(encrypt.decrypt(new String(bytes).getBytes("UTF-8"),keys[times-1-i]),length); //TODO change this
             previous=newMsg;
         }
         return previous;
