@@ -115,6 +115,50 @@ public class TorMessage {
         pack();
     }
 
+    // used to construct when receiving WITH lengths
+    public TorMessage(byte[] fullPackedMessageBytes) throws Exception {
+        ByteBuffer packedMessage = ByteBuffer.wrap(fullPackedMessageBytes);
+
+        length = packedMessage.getInt();;
+        int typeInt = packedMessage.getInt();
+        type = Type.toEnum(typeInt);
+
+        byte[] publicKeyBytes;
+        switch (type) {
+            case CREATE:
+            case CREATED:
+            case EXTENDED:
+                publicKeyBytes = new byte[length - 4];
+                packedMessage.get(publicKeyBytes, 0, length - 4);
+
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
+                break;
+
+            case BEGIN:
+            case DATA:
+            case RELAY:
+            case AES_REQUEST:
+            case AES_RESPONSE:
+                payload = new byte[length - 4];
+                packedMessage.get(payload, 0, length - 4);
+                break;
+
+            case EXTEND:
+                byte[] serverNameBytes = new byte[SERVER_NAME_MAX_LEN + 2];
+                packedMessage.get(serverNameBytes, 0, SERVER_NAME_MAX_LEN + 2);
+                
+                String extendHostJunk = new String(serverNameBytes);
+                extendHost = extendHostJunk.split(" ")[0];
+
+                extendPort = packedMessage.getInt();
+
+                publicKeyBytes = new byte[packedMessage.remaining()];
+                packedMessage.get(publicKeyBytes, 0, packedMessage.remaining());
+                publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
+                break;
+        }
+    }
+
     // used to construct when receiving
     // TODO: don't actually need to pass in length right now
     public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
