@@ -118,6 +118,7 @@ public class TorMessage {
     // used to construct when receiving WITH lengths
     public TorMessage(byte[] fullPackedMessageBytes) throws Exception {
         ByteBuffer packedMessage = ByteBuffer.wrap(fullPackedMessageBytes);
+        bytes = packedMessage;
 
         length = packedMessage.getInt();;
         int typeInt = packedMessage.getInt();
@@ -163,6 +164,8 @@ public class TorMessage {
     // TODO: don't actually need to pass in length right now
     public TorMessage(byte[] packedMessageBytes, int length) throws Exception {
         ByteBuffer packedMessage = ByteBuffer.wrap(packedMessageBytes);
+        bytes = ByteBuffer.wrap(packedMessageBytes);
+//        System.out.println("pos: " + bytes.position() + "  limit: "+ bytes.limit());
 
         this.length = length;
         int typeInt = packedMessage.getInt();
@@ -241,9 +244,7 @@ public class TorMessage {
         byte[] byteRepr = new byte[bytes.capacity()];
         
         // read
-        bytes.flip();
-        System.out.println(bytes.capacity() + ":" + byteRepr.length);
-        System.out.println(bytes.position());
+        bytes.position(0);
         bytes.get(byteRepr, 0, byteRepr.length);
 
         // go back to writing

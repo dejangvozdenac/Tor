@@ -58,73 +58,14 @@ class TorMessageHandler implements Runnable{
                 if(inFromPrevious.available()>0) {
 //                    &&(clientReqLen=inFromPrevious.readLine())!=""
                     TorMessage receivedMsg = TorClient.readMessage(inFromPrevious);
-                    switch (receivedMsg.getType()) {
-                        case CREATE:
-                            //alocate resources, agree on keytoString
-                            TorMessage createdMsg = new TorMessage(TorMessage.Type.CREATED,
-                                    encryption.getPublicKey());
-                            remotePublicKey = receivedMsg.getPublicKey();
-                            outToPrevious.write(createdMsg.getBytes());
-                            break;
-                        case EXTEND:
-                            exitServer = false;
-                            byte[] decryptedBytes = aesEncryption.decrypt(receivedMsg.getPayload(),secretKey);
-                            TorMessage decrypted = new TorMessage(decryptedBytes, decryptedBytes.length+4);
-                            String nextTorHost = decrypted.getExtendHost();
-                            int nextTorPort = decrypted.getExtendPort();
-                            InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
-                            Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
-                            inFromNext = nextTorSocket.getInputStream();
-                            outToNext = new DataOutputStream(nextTorSocket.getOutputStream());
-                            break;
-                        case RELAY:
-                            // byte[] decrypted = encryption.decrypt(receivedMsg.getBytes(), encryption.getPrivateKey());
-                            // outToNext.write(decrypted);
-                            break;
-                        case DATA:
-                            TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getPayload());
-                            outToPrevious.write(dataRelay.getBytes());
-                            outToPrevious.write("\n".getBytes());
-                            break;
-                        case BEGIN:
-                            if (exitServer) {
-                                String targetURL = receivedMsg.getURL();
-                                String response = getHTML(targetURL);
-                                TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response );
-                                outToPrevious.write(dataResponse.getBytes());
-                            } else {
-                                TorMessage beginRelay = new TorMessage(
-                                        TorMessage.Type.BEGIN, receivedMsg.getURL() );
-                                outToNext.write(beginRelay.getBytes());
-                            }
-                            break;
-                        case TEARDOWN:
-                            if (!exitServer) {
-                                TorMessage tearDown = new TorMessage(TorMessage.Type.TEARDOWN, "");
-                                outToNext.write(tearDown.getBytes());
-                            }
-                            connOpen = false;
-                            break;
-                        case AES_REQUEST:
-                            AES aes = new AES(
-                                    encryption.decrypt(receivedMsg.getPayload(), encryption.getPrivateKey()),
-                                    aesEncryption.createHalf());
-                            TorMessage aesResponse = new TorMessage(TorMessage.Type.AES_RESPONSE,
-                                    encryption.encrypt(aes.getSecretKey().getEncoded(),remotePublicKey));
-                            outToPrevious.write(aesResponse.getBytes());
-                            break;
-                        default:
-                            TorServer.Debug(receivedMsg.getType()+"- not handled");
-                    }
+                    connOpen = parseIncomingMessage(connOpen, receivedMsg);
                     TorServer.Debug("Processed Request");
                 }
                 if(!exitServer&&inFromNext.available()>0){
-//                    &&(nextResponseLen=inFromNext.readLine())!=""
                     TorMessage receivedMsg = TorClient.readMessage(inFromNext);
                     TorServer.Debug("RELAYING BACK");
-                    AES enc = new AES();
                     TorMessage dataRelay = new TorMessage(TorMessage.Type.RELAY,
-                            enc.encrypt(receivedMsg.getPayload(),secretKey));
+                            aesEncryption.encrypt(receivedMsg.getBytes(),secretKey));
                     outToPrevious.write(dataRelay.getBytes());
                 }
             }
@@ -132,6 +73,69 @@ class TorMessageHandler implements Runnable{
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean parseIncomingMessage(boolean connOpen, TorMessage receivedMsg) throws Exception {
+        switch (receivedMsg.getType()) {
+            case CREATE:
+                //alocate resources, agree on keytoString
+                TorMessage createdMsg = new TorMessage(TorMessage.Type.CREATED,
+                        encryption.getPublicKey());
+                remotePublicKey = receivedMsg.getPublicKey();
+                outToPrevious.write(createdMsg.getBytes());
+                break;
+            case EXTEND:
+                exitServer = false;
+                String nextTorHost = receivedMsg.getExtendHost();
+                int nextTorPort = receivedMsg.getExtendPort();
+                InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
+                Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
+                inFromNext = nextTorSocket.getInputStream();
+                outToNext = new DataOutputStream(nextTorSocket.getOutputStream());
+                break;
+            case RELAY:
+                 byte[] decryptedRelay = aesEncryption.decrypt(receivedMsg.getPayload(), secretKey);
+                 outToNext.write(decryptedRelay);
+                break;
+            case DATA:
+                byte[] decryptedData = aesEncryption.decrypt(receivedMsg.getPayload(), secretKey);
+                receivedMsg = new TorMessage(decryptedData);
+                receivedMsg.printString();
+                connOpen=parseIncomingMessage(connOpen,receivedMsg);
+                break;
+            case BEGIN:
+                assert(exitServer);
+                byte[] decryptedBegin = aesEncryption.decrypt(receivedMsg.getPayload(), secretKey);
+
+                String targetURL = new String (decryptedBegin);
+                String response = getHTML(targetURL);
+                TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response);
+                TorMessage beginResponse = new TorMessage(TorMessage.Type.DATA,
+                        aesEncryption.encrypt(dataResponse.getBytes(),secretKey));
+                outToPrevious.write(beginResponse.getBytes());
+                break;
+            case TEARDOWN:
+                if (!exitServer) {
+                    TorMessage tearDown = new TorMessage(TorMessage.Type.TEARDOWN, "");
+                    outToNext.write(tearDown.getBytes());
+                }
+                connOpen = false;
+                break;
+            case AES_REQUEST:
+                receivedMsg.printString();
+              System.out.println(encryption.decrypt(receivedMsg.getPayload(), encryption.getPrivateKey()).length);
+                AES aes = new AES(
+                        aesEncryption.createHalf(),
+                        aesEncryption.createHalf());
+                secretKey = aes.getSecretKey();
+                TorMessage aesResponse = new TorMessage(TorMessage.Type.AES_RESPONSE,
+                        encryption.encrypt(aes.getSecretKey().getEncoded(),remotePublicKey));
+                outToPrevious.write(aesResponse.getBytes());
+                break;
+            default:
+                TorServer.Debug(receivedMsg.getType()+"- not handled");
+        }
+        return connOpen;
     }
 
     public static String getHTML(String urlToRead) throws Exception {

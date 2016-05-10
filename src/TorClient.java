@@ -121,8 +121,14 @@ public class TorClient {
             //send extend messsage
             TorMessage extendMsg = new TorMessage(TorMessage.Type.EXTEND,encryption.getPublicKey(),orServerName,orPort);
             //encrypt and relay it
-            TorMessage encryptedExtend = AESMultipleEncrypt(extendMsg, secretKeys, i);
+            TorMessage encryptedExtend = AESMultipleEncryptExtend(extendMsg, secretKeys, i);
             outToServer.write(encryptedExtend.getBytes());
+
+            //send create messsage
+            TorMessage createMsg = new TorMessage(TorMessage.Type.CREATE,encryption.getPublicKey());
+            //encrypt and relay it
+            TorMessage encryptedCreate = AESMultipleEncrypt(createMsg, secretKeys, i);
+            outToServer.write(encryptedCreate.getBytes());
 
             //get response back
             TorMessage extendResponse= readMessage(inFromServer);
@@ -158,30 +164,45 @@ public class TorClient {
 
     private static TorMessage AESMultipleEncrypt(TorMessage msg, SecretKey[] keys, int times) throws  Exception{
         TorMessage previous = msg;
-        previous.printString();
         TorMessage newMsg;
         AES aesEncrypt = new AES();
+
         for (int i =0; i<times; i++){
             newMsg=new TorMessage(TorMessage.Type.RELAY,aesEncrypt.encrypt(previous.getBytes(),keys[i]));
             previous=newMsg;
-            previous.printString();
+        }
+        return previous;
+    }
+
+    private static TorMessage AESMultipleEncryptExtend(TorMessage msg, SecretKey[] keys, int times) throws  Exception{
+        TorMessage previous = msg;
+        TorMessage newMsg;
+        AES aesEncrypt = new AES();
+        newMsg=new TorMessage(TorMessage.Type.DATA,aesEncrypt.encrypt(previous.getBytes(),keys[0]));
+        previous=newMsg;
+
+        for (int i =1; i<times; i++){
+            newMsg=new TorMessage(TorMessage.Type.RELAY,aesEncrypt.encrypt(previous.getBytes(),keys[i]));
+            previous=newMsg;
         }
         return previous;
     }
 
     private static TorMessage AESMultipleDecrypt(TorMessage msg, SecretKey[] keys, int times) throws Exception{
+        Debug("AES CALLED");
         TorMessage previous = msg;
+        previous.printString();
         TorMessage newMsg;
         AES encrypt = new AES();
+
         for(int i = 0; i < times; i++){
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(previous.getPayload()));
-            int length = in.readInt();
+            //TODO need to eat the length
+            TorMessage tmp = new TorMessage(previous.getPayload());
+            byte[] decrypted = encrypt.decrypt(tmp.getPayload(), keys[times - 1 - i]);
+            newMsg = new TorMessage(decrypted,decrypted.length-4);
 
-            byte[] bytes = new byte[length];
-            in.read(bytes, 0, length);
-
-            newMsg = new TorMessage(encrypt.decrypt(bytes, keys[times - 1 - i]), length);
             previous = newMsg;
+            previous.printString();
         }
         return previous;
     }
