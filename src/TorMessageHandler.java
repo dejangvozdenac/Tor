@@ -77,6 +77,10 @@ class TorMessageHandler implements Runnable{
                             inFromNext = nextTorSocket.getInputStream();
                             outToNext = new DataOutputStream(nextTorSocket.getOutputStream());
                             break;
+                        case RELAY:
+                            // byte[] decrypted = encryption.decrypt(receivedMsg.getBytes(), encryption.getPrivateKey());
+                            // outToNext.write(decrypted);
+                            break;
                         case DATA:
                             TorMessage dataRelay = new TorMessage(TorMessage.Type.DATA, receivedMsg.getPayload());
                             outToPrevious.write(dataRelay.getBytes());
