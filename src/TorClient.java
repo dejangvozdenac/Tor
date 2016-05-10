@@ -173,14 +173,15 @@ public class TorClient {
         TorMessage previous = msg;
         TorMessage newMsg;
         AES encrypt = new AES();
-        for(int i =0; i< times; i++){
-            BufferedReader in = new BufferedReader(new InputStreamReader
-                    (new ByteArrayInputStream(previous.getPayload())));
-            int length = Integer.parseInt(in.readLine());
-            char[] bytes = new char[length];
-            in.read(bytes,0,length);
-            newMsg = new TorMessage(encrypt.decrypt(new String(bytes).getBytes("UTF-8"),keys[times-1-i]),length); //TODO change this
-            previous=newMsg;
+        for(int i = 0; i < times; i++){
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(previous.getPayload()));
+            int length = in.readInt();
+
+            byte[] bytes = new byte[length];
+            in.read(bytes, 0, length);
+
+            newMsg = new TorMessage(encrypt.decrypt(bytes, keys[times - 1 - i]), length);
+            previous = newMsg;
         }
         return previous;
     }
