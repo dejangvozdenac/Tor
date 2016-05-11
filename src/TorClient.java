@@ -52,8 +52,6 @@ public class TorClient {
         //do the handshake
         establishSecureConnection(outToServer, inFromServer);
 
-        Debug("AUTOMATIC MODE");
-
         setupCircuit(outToServer, inFromServer, path);
 
         // get input
@@ -62,6 +60,11 @@ public class TorClient {
 
         // fetch data
         while (filename.length() != 0) {
+            if(filename.equals("exit")){
+                System.out.printf("Teardown");
+                teardownCircuit(outToServer, inFromServer);
+                break;
+            }
             // write to target server
             String url = filenametoURL(serverName, serverPort, filename);
             retrieveURL(outToServer, inFromServer, url);
@@ -71,19 +74,20 @@ public class TorClient {
             filename = inFromUser.readLine();
         }
 
-        teardownCircuit(outToServer, inFromServer);
-
         // close client socket
         clientSocket.close();
+        inFromUser.close();
     }
 
     private static void retrieveURL(DataOutputStream outToServer, InputStream inFromServer, String url) throws Exception {
-          TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
-        TorMessage encrypted = AESMultipleEncrypt(dataMsg,secretKeys,ONION_SERVER_COUNT);
+        TorMessage dataMsg = new TorMessage(TorMessage.Type.BEGIN, url);
+        TorMessage encrypted = AESMultipleEncryptExtend(dataMsg,secretKeys,ONION_SERVER_COUNT);
         outToServer.write(encrypted.getBytes());
 
         TorMessage msgFromServer = readMessage(inFromServer);
-        Debug("Received: " + msgFromServer.getPayload());
+        TorMessage decryptedResponse = AESMultipleDecrypt(msgFromServer, secretKeys, ONION_SERVER_COUNT);
+        String response = new String(decryptedResponse.getPayload());
+        Debug("Received: " + response.substring(4, response.length()));
     }
 
     private static void teardownCircuit(DataOutputStream outToServer, InputStream inFromServer) throws Exception {
@@ -107,7 +111,6 @@ public class TorClient {
         outBuffer.write(aesMsg.getBytes());
 
         TorMessage aesFromServer = readMessage(inBuffer);
-        Debug("Received: " + aesFromServer.toString());
         secretKeys[0] = new SecretKeySpec(
                 encryption.decrypt(aesFromServer.getPayload(), encryption.getPrivateKey()),"AES");
     }
@@ -144,7 +147,7 @@ public class TorClient {
             outToServer.write(encryptedAES.getBytes());
 
             TorMessage aesFromServer = readMessage(inFromServer);
-            TorMessage aesDecrypted = AESMultipleEncrypt(aesFromServer,secretKeys,i);
+            TorMessage aesDecrypted = AESMultipleDecrypt(aesFromServer,secretKeys,i);
             secretKeys[i] = new SecretKeySpec(
                     encryption.decrypt(aesDecrypted.getPayload(), encryption.getPrivateKey()),"AES");
 
@@ -189,20 +192,13 @@ public class TorClient {
     }
 
     private static TorMessage AESMultipleDecrypt(TorMessage msg, SecretKey[] keys, int times) throws Exception{
-        Debug("AES CALLED");
         TorMessage previous = msg;
-        previous.printString();
-        TorMessage newMsg;
         AES encrypt = new AES();
 
         for(int i = 0; i < times; i++){
-            //TODO need to eat the length
-            TorMessage tmp = new TorMessage(previous.getPayload());
-            byte[] decrypted = encrypt.decrypt(tmp.getPayload(), keys[times - 1 - i]);
-            newMsg = new TorMessage(decrypted,decrypted.length-4);
-
-            previous = newMsg;
-            previous.printString();
+            byte[] tmp = previous.getPayload();
+            byte[] decrypted = encrypt.decrypt(tmp, keys[times - 1 - i]);
+            previous = new TorMessage(decrypted, decrypted.length);
         }
         return previous;
     }

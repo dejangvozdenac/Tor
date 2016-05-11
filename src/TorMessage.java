@@ -58,8 +58,8 @@ public class TorMessage {
                 case 10:
                     return Type.TEARDOWN;
                 default:
-                    System.out.println("BAD: " + Integer.toString(id));
-                    return Type.BEGIN; // TODO: BAD
+                    //actually used
+                    return Type.BEGIN;
             }
         }
     }
@@ -104,7 +104,7 @@ public class TorMessage {
     public TorMessage(Type type, String url) {
         this.length = 4 + 4 + url.length();
         this.type = type;
-        this.url = url;
+        this.payload = url.getBytes();
         pack();
     }
 
@@ -120,7 +120,7 @@ public class TorMessage {
         ByteBuffer packedMessage = ByteBuffer.wrap(fullPackedMessageBytes);
         bytes = packedMessage;
 
-        length = packedMessage.getInt();;
+        length = packedMessage.getInt();
         int typeInt = packedMessage.getInt();
         type = Type.toEnum(typeInt);
 
@@ -137,6 +137,9 @@ public class TorMessage {
 
             case BEGIN:
             case DATA:
+                payload = new byte[length - 8];
+                packedMessage.get(payload, 0, length - 8);
+                break;
             case RELAY:
             case AES_REQUEST:
             case AES_RESPONSE:
@@ -237,6 +240,8 @@ public class TorMessage {
             case AES_RESPONSE:
                 bytes.put(payload);
                 break;
+            case TEARDOWN:
+                break;
         }
     }
 
@@ -271,6 +276,7 @@ public class TorMessage {
 
         if (payload != null) {
             System.out.println("payload: " + new String(payload));
+            System.out.println("payload length: " + payload.length);
         }
 
         if (url != null) {

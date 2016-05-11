@@ -16,6 +16,7 @@ import java.security.PublicKey;
 
 class TorMessageHandler implements Runnable{
     private Socket connSocket;
+    private Socket nextTorSocket;
     private InputStream inFromPrevious;
     private DataOutputStream outToPrevious;
     private InputStream inFromNext;
@@ -56,7 +57,6 @@ class TorMessageHandler implements Runnable{
             boolean connOpen = true;
             while(connOpen) {
                 if(inFromPrevious.available()>0) {
-//                    &&(clientReqLen=inFromPrevious.readLine())!=""
                     TorMessage receivedMsg = TorClient.readMessage(inFromPrevious);
                     connOpen = parseIncomingMessage(connOpen, receivedMsg);
                     TorServer.Debug("Processed Request");
@@ -68,8 +68,15 @@ class TorMessageHandler implements Runnable{
                             aesEncryption.encrypt(receivedMsg.getBytes(),secretKey));
                     outToPrevious.write(dataRelay.getBytes());
                 }
+                //close if the previous socket closed it
+                if(connSocket.isClosed()){
+                    connOpen=false;
+                }
             }
             connSocket.close();
+            if(!exitServer) {
+                nextTorSocket.close();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -89,7 +96,7 @@ class TorMessageHandler implements Runnable{
                 String nextTorHost = receivedMsg.getExtendHost();
                 int nextTorPort = receivedMsg.getExtendPort();
                 InetAddress nextTorIP = InetAddress.getByName(nextTorHost);
-                Socket nextTorSocket = new Socket(nextTorIP, nextTorPort);
+                nextTorSocket = new Socket(nextTorIP, nextTorPort);
                 inFromNext = nextTorSocket.getInputStream();
                 outToNext = new DataOutputStream(nextTorSocket.getOutputStream());
                 break;
@@ -100,17 +107,14 @@ class TorMessageHandler implements Runnable{
             case DATA:
                 byte[] decryptedData = aesEncryption.decrypt(receivedMsg.getPayload(), secretKey);
                 receivedMsg = new TorMessage(decryptedData);
-                receivedMsg.printString();
                 connOpen=parseIncomingMessage(connOpen,receivedMsg);
                 break;
             case BEGIN:
                 assert(exitServer);
-                byte[] decryptedBegin = aesEncryption.decrypt(receivedMsg.getPayload(), secretKey);
-
-                String targetURL = new String (decryptedBegin);
+                String targetURL = new String (receivedMsg.getPayload());
                 String response = getHTML(targetURL);
                 TorMessage dataResponse = new TorMessage(TorMessage.Type.DATA, response);
-                TorMessage beginResponse = new TorMessage(TorMessage.Type.DATA,
+                TorMessage beginResponse = new TorMessage(TorMessage.Type.RELAY,
                         aesEncryption.encrypt(dataResponse.getBytes(),secretKey));
                 outToPrevious.write(beginResponse.getBytes());
                 break;
@@ -122,8 +126,6 @@ class TorMessageHandler implements Runnable{
                 connOpen = false;
                 break;
             case AES_REQUEST:
-                receivedMsg.printString();
-              System.out.println(encryption.decrypt(receivedMsg.getPayload(), encryption.getPrivateKey()).length);
                 AES aes = new AES(
                         aesEncryption.createHalf(),
                         aesEncryption.createHalf());
